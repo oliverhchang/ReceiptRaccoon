@@ -18,26 +18,12 @@ SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 
 # 2. Setup Services
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
-
-
-# --- HELPER: PRIVACY CROP ---
-def privacy_crop(image_bytes):
-    try:
-        img = Image.open(io.BytesIO(image_bytes))
-        width, height = img.size
-        new_height = int(height * 0.75)  # Keep top 75%
-        cropped_img = img.crop((0, 0, width, new_height))
-        output_buffer = io.BytesIO()
-        cropped_img.save(output_buffer, format=img.format)
-        return output_buffer.getvalue()
-    except:
-        return image_bytes
 
 
 # --- MAIN EVENT ---
@@ -49,57 +35,58 @@ async def on_message(message):
         attachment = message.attachments[0]
         if any(attachment.filename.lower().endswith(ext) for ext in ['png', 'jpg', 'jpeg', 'webp']):
 
-            status_msg = await message.channel.send("👀 Processing Receipt...")
+            status_msg = await message.channel.send("👀 Processing Receipt (Full Image)...")
 
             try:
-                # A. Download & Crop
+                # A. Download Image (No cropping anymore)
                 image_bytes = await attachment.read()
-                safe_bytes = privacy_crop(image_bytes)
 
                 # B. Upload Image to Supabase Storage
-                # We give it a random name so it doesn't overwrite others
                 file_name = f"{uuid.uuid4()}.jpg"
                 supabase.storage.from_("receipts").upload(
-                    file=safe_bytes,
+                    file=image_bytes,
                     path=file_name,
                     file_options={"content-type": "image/jpeg"}
                 )
 
-                # Get the Public URL so the website can see it
+                # Get the Public URL
                 image_url = supabase.storage.from_("receipts").get_public_url(file_name)
 
-                # C. Analyze with Gemini
-                # We ask for VERY specific JSON so it's easy to save
+                # C. Analyze with Gemini (UPDATED PROMPT)
                 prompt = """
-                Analyze this receipt. Extract data into this exact JSON format:
+                Analyze this receipt image. Extract the following data into strict JSON format:
                 {
-                    "store": "Store Name",
+                    "store": "Name of the store (e.g. Trader Joe's)",
+                    "address": "The street address or city printed on receipt",
+                    "date": "YYYY-MM-DD (The date of purchase)",
                     "total": 12.34,
                     "items": [
-                        {"name": "Milk", "price": 4.00, "category": "Dairy"},
-                        {"name": "Bread", "price": 2.50, "category": "Bakery"}
+                        {"name": "Item Name", "price": 0.00, "category": "Food/Home/Alc"}
                     ]
                 }
-                If you can't read it, return {"error": "unreadable"}.
+                If the date is missing, estimate it or leave null. 
+                If you can't read the receipt, return {"error": "unreadable"}.
                 """
 
                 response = model.generate_content([
                     prompt,
-                    {"mime_type": "image/jpeg", "data": safe_bytes}
+                    {"mime_type": "image/jpeg", "data": image_bytes}
                 ])
 
-                # Clean up the response (remove ```json marks)
+                # Clean up the response
                 raw_text = response.text.replace("```json", "").replace("```", "").strip()
-                data = json.loads(raw_text)  # Turn text into Python Dictionary
+                data = json.loads(raw_text)
 
                 if "error" in data:
                     await status_msg.edit(content="❌ I couldn't read that receipt.")
                     return
 
-                # D. Save to Database
+                # D. Save to Database (Including Date & Address)
                 receipt_entry = {
                     "discord_user_id": str(message.author.id),
-                    "store_name": data.get("store", "Unknown"),
+                    "store_name": data.get("store", "Unknown Store"),
+                    "store_address": data.get("address", None),  # Captured Address
+                    "purchase_date": data.get("date", None),  # Captured Date
                     "total_amount": data.get("total", 0.0),
                     "items": data.get("items", []),
                     "image_url": image_url
@@ -108,8 +95,9 @@ async def on_message(message):
                 supabase.table("receipts").insert(receipt_entry).execute()
 
                 # E. Success!
+                display_date = data.get('date', 'Unknown Date')
                 await status_msg.edit(
-                    content=f"✅ **Saved!**\nStore: {data['store']}\nTotal: ${data['total']}\n*Items archived in Supabase.*")
+                    content=f"✅ **Saved!**\n📅 Date: {display_date}\n🏪 Store: {data['store']}\n💰 Total: ${data['total']}")
 
             except Exception as e:
                 await status_msg.edit(content=f"❌ Error: {str(e)}")
