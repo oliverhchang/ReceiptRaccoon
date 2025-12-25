@@ -1,95 +1,74 @@
 import React, { useEffect, useState } from 'react'
 import { Calendar as CalendarIcon, TrendingUp } from 'lucide-react'
-import { supabase } from '../supabaseClient' // Import the connection
+import { supabase } from '../supabaseClient'
 import './RightSidebar.css'
 
-export default function RightSidebar() {
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState({
-    name: "Loading...",
-    handle: "@...",
-    location: "Sunnyvale, CA",
-    budget: 0,
+// Now accepts "currentUser" as a prop!
+export default function RightSidebar({ currentUser }) {
+  const [loading, setLoading] = useState(false)
+  const [stats, setStats] = useState({
     spent: 0,
-    avatarUrl: "https://cdn.discordapp.com/embed/avatars/0.png"
+    budget: 2000,
+    receiptDays: []
   })
-  const [receiptDays, setReceiptDays] = useState([]) // Stores days you bought stuff
 
+  // Whenever "currentUser" changes, re-fetch THEIR stats
   useEffect(() => {
-    fetchSidebarData()
-  }, [])
+    if (currentUser) {
+      fetchUserStats()
+    }
+  }, [currentUser])
 
-  async function fetchSidebarData() {
+  async function fetchUserStats() {
     setLoading(true)
-
-    // 1. Get the current month range (e.g., Dec 1st to Dec 31st)
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
 
     try {
-      // A. Fetch User Settings (Budget & Avatar)
-      // *Tip: For now we just grab the first user. Later we can filter by ID.*
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .limit(1)
-        .single()
-
-      // B. Fetch Receipts for THIS Month (to sum up spending)
-      const { data: receipts, error: receiptError } = await supabase
+      // 1. Fetch Receipts ONLY for this specific user
+      const { data: receipts, error } = await supabase
         .from('receipts')
         .select('total_amount, purchase_date')
+        .eq('discord_user_id', currentUser.discord_id) // <--- CRITICAL FILTER
         .gte('purchase_date', startOfMonth)
         .lte('purchase_date', endOfMonth)
 
-      if (userError && userError.code !== 'PGRST116') console.error("User Error:", userError)
-      if (receiptError) console.error("Receipt Error:", receiptError)
+      if (error) console.error("Error fetching stats:", error)
 
-      // C. Calculate Totals
+      // 2. Calculate Totals
       const totalSpent = receipts?.reduce((sum, r) => sum + (r.total_amount || 0), 0) || 0
-
-      // D. Find which days had receipts (for the calendar)
       const days = receipts?.map(r => new Date(r.purchase_date).getDate()) || []
 
-      // E. Update State
-      if (userData) {
-        setUser({
-          name: userData.display_name || "Raccoon User",
-          handle: `@user_${userData.discord_id?.slice(0,4)}`,
-          location: "Sunnyvale, CA", // Hardcoded for now
-          budget: userData.monthly_budget || 2000,
-          spent: totalSpent,
-          avatarUrl: userData.avatar_url || "https://cdn.discordapp.com/embed/avatars/0.png"
-        })
-      } else {
-        // Fallback if no user exists in table yet
-        setUser(prev => ({ ...prev, spent: totalSpent, budget: 2000, name: "No User Found" }))
-      }
+      setStats({
+        spent: totalSpent,
+        budget: currentUser.monthly_budget || 2000, // Use the user's custom budget
+        receiptDays: days
+      })
 
-      setReceiptDays(days)
-
-    } catch (error) {
-      console.error("Critical Error:", error)
+    } catch (err) {
+      console.error(err)
     } finally {
       setLoading(false)
     }
   }
 
-  // Calculate Progress
-  const percentSpent = Math.min((user.spent / (user.budget || 1)) * 100, 100)
+  // If no user is selected yet
+  if (!currentUser) return <aside className="right-sidebar">Loading...</aside>
+
+  const percentSpent = Math.min((stats.spent / stats.budget) * 100, 100)
 
   return (
     <aside className="right-sidebar">
 
-      {/* 1. PROFILE */}
+      {/* 1. PROFILE (Uses the passed prop data directly) */}
       <div className="profile-card">
         <div className="profile-header">
-          <img src={user.avatarUrl} alt="Profile" className="profile-avatar-large" />
+          <img src={currentUser.avatar_url} alt="Profile" className="profile-avatar-large" />
           <div className="profile-info">
-            <h3>{user.name}</h3>
-            <span className="profile-handle">{user.handle}</span>
-            <span className="profile-location">📍 {user.location}</span>
+            <h3>{currentUser.display_name}</h3>
+            <span className="profile-handle">@{currentUser.display_name.toLowerCase().replace(/\s/g, '')}</span>
+            <span className="profile-location">📍 Sunnyvale, CA</span>
           </div>
         </div>
       </div>
@@ -103,30 +82,15 @@ export default function RightSidebar() {
 
         <div className="budget-card">
           <div className="budget-text">
-            {loading ? (
-              <span>Calculating...</span>
-            ) : (
-              <>
-                <span className="spent">${user.spent.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-                <span className="total"> / ${user.budget.toLocaleString()}</span>
-              </>
-            )}
+            <span className="spent">${stats.spent.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+            <span className="total"> / ${stats.budget.toLocaleString()}</span>
           </div>
 
           <div className="progress-bar-bg">
             <div
               className="progress-bar-fill"
-              style={{width: `${percentSpent}%`, backgroundColor: percentSpent > 90 ? 'red' : ''}}
+              style={{width: `${percentSpent}%`, backgroundColor: percentSpent > 90 ? '#fe6b40' : ''}}
             ></div>
-          </div>
-
-          <div className="budget-status">
-            {percentSpent < 85 ? (
-              <span className="status-good">👍 On Track</span>
-            ) : (
-              <span className="status-warning">⚠️ Watch Out!</span>
-            )}
-            <span className="percentage">{Math.round(percentSpent)}%</span>
           </div>
         </div>
       </div>
@@ -134,32 +98,21 @@ export default function RightSidebar() {
       {/* 3. CALENDAR */}
       <div className="sidebar-section">
         <div className="section-header">
-          <h4>Grocery Trips (Dec)</h4>
+          <h4>Grocery Trips</h4>
           <CalendarIcon size={16} color="#a0aec0" />
         </div>
 
         <div className="mini-calendar">
           {['S','M','T','W','T','F','S'].map(d => <div key={d} className="cal-head">{d}</div>)}
-
-          {/* Render 31 days (Simple view) */}
           {Array.from({length: 31}, (_, i) => {
             const day = i + 1;
-            const hasReceipt = receiptDays.includes(day);
+            const hasReceipt = stats.receiptDays.includes(day);
             return (
               <div key={day} className={`cal-day ${hasReceipt ? 'active' : ''}`}>
                 {day}
               </div>
             )
           })}
-        </div>
-      </div>
-
-      {/* 4. TIP */}
-      <div className="raccoon-tip">
-        <div className="tip-icon">💡</div>
-        <div className="tip-content">
-          <strong>Raccoon Tip:</strong>
-          <p>This data is real! Upload a receipt to Discord to see the bar move.</p>
         </div>
       </div>
 

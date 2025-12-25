@@ -59,23 +59,29 @@ async def on_message(message):
 
                 # C. Analyze with Gemini (Vision)
                 prompt = f"""
-                Analyze this receipt image. Extract the following data into strict JSON format:
-                {{
-                    "store": "Name of the store (e.g. Trader Joe's)",
-                    "address": "The street address or city",
-                    "date": "YYYY-MM-DD",
-                    "total": 12.34,
-                    "items": [
-                        {{"name": "Item Name", "price": 0.00, "category": "Exact Category"}}
-                    ]
-                }}
+                                Analyze this receipt image. Extract items into strict JSON format.
 
-                RULES:
-                1. For 'category', use EXACTLY one of these: {json.dumps(VALID_CATEGORIES)}
-                2. If an item doesn't fit, use "Grains & Staples" or "Snacks & Sweets" as best guess.
-                3. If date is missing, leave null.
-                4. Return only JSON.
-                """
+                                VALID CATEGORIES LIST:
+                                {json.dumps(VALID_CATEGORIES)}
+
+                                OUTPUT FORMAT:
+                                {{
+                                    "store": "Store Name",
+                                    "address": "Address or City",
+                                    "date": "YYYY-MM-DD",
+                                    "total": 12.34,
+                                    "items": [
+                                        {{"name": "Item Name", "price": 0.00, "category": "Category from LIST"}}
+                                    ]
+                                }}
+
+                                CRITICAL RULES:
+                                1. You MUST categorize each item into one of the VALID CATEGORIES listed above.
+                                2. Do NOT use generic terms like "Food" or "Groceries".
+                                3. If 'Cucumber', label as 'Vegetables'. If 'Steak', label as 'Meat / Fish'.
+                                4. If an item is ambiguous, choose the closest match or use 'Misc'.
+                                5. Return ONLY valid JSON.
+                                """
 
                 response = model.generate_content([
                     prompt,
