@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css2?family=Mogra&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* YOUR PALETTE */
+  --raccoon-orange-bright: #fe6b40;
+  --raccoon-orange:      #ff8829;
+  --raccoon-orange-light:#ffb366;
+  --raccoon-green-lime:  #a5c90f;
+  --raccoon-green-leaf:  #6f9c3d;
+
+  /* UI COLORS */
+  --bg-app:     #f8f9fa; /* Very subtle grey for the main background */
+  --bg-surface: #ffffff; /* Pure white for sidebar and cards */
+  --text-main:  #2d3748;
+  --text-muted: #a0aec0;
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--bg-app);
+  font-family: 'Inter', sans-serif;
+  color: var(--text-main);
+  overflow: hidden;
+}
+
+/* --- LEFT SIDEBAR (Modern & White) --- */
+.sidebar {
+  width: 260px;
+  background-color: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  padding: 30px 20px;
+  flex-shrink: 0;
+  /* Soft shadow instead of a border */
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+  z-index: 10;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  /* Logo Font Settings */
+  font-family: 'Mogra', system-ui;
+  font-size: 1.6rem;
+  color: var(--raccoon-orange-bright); /* Brand Color */
+
+  margin-bottom: 50px;
+  padding-left: 10px;
+}
+
+/* NAVIGATION LINKS */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 16px; /* Super rounded corners */
+  cursor: pointer;
+
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: #718096; /* Neutral grey when inactive */
+
+  transition: all 0.3s ease;
+  margin-bottom: 8px;
+}
+
+/* Hover State: Subtle Highlight */
+.nav-item:hover {
+  background-color: #fff5f0; /* Very faint orange tint */
+  color: var(--raccoon-orange);
+  transform: translateX(3px); /* Little slide effect */
+}
+
+/* Active State: The "Main Color" Pop */
+.nav-item.active {
+  background-color: var(--raccoon-orange-bright);
+  color: white;
+  box-shadow: 0 4px 12px rgba(254, 107, 64, 0.3); /* Glowing orange shadow */
+}
+
+/* --- MAIN CONTENT AREA --- */
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* --- TOP HEADER (Transparent/Clean) --- */
+.top-header {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  background-color: transparent; /* Blends with bg-app */
+}
+
+.search-container {
+  position: relative;
+  width: 400px;
+}
+
+.search-bar {
+  background-color: var(--bg-surface);
+  border: none;
+  padding: 14px 20px 14px 50px; /* Space for icon */
+  border-radius: 14px;
+  width: 100%;
+  color: var(--text-main);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.03); /* Soft floaty shadow */
+  outline: none;
+  font-size: 0.9rem;
+}
+
+.search-bar::placeholder {
+  color: #cbd5e0;
+}
+
+/* --- USER PROFILE (Top Right) --- */
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: var(--bg-surface);
+  padding: 8px 12px 8px 20px;
+  border-radius: 50px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+  cursor: pointer;
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--raccoon-orange-bright), var(--raccoon-orange-light));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+/* --- PAGE CONTENT --- */
+.page-content {
+  flex: 1;
+  padding: 0 40px 40px 40px;
+  overflow-y: auto;
+}

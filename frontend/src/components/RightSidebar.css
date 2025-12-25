@@ -1,0 +1,144 @@
+/* src/components/RightSidebar.css */
+
+.right-sidebar {
+  width: 300px;
+  background-color: var(--bg-surface);
+  padding: 30px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  /* Left Shadow to separate from content */
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.02);
+  z-index: 10;
+  overflow-y: auto;
+}
+
+/* PROFILE CARD */
+.profile-card {
+  text-align: center;
+}
+
+.profile-avatar-large {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 4px solid #fff5f0; /* Orange Tint Ring */
+  margin-bottom: 12px;
+}
+
+.profile-info h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.profile-handle {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--raccoon-orange);
+  margin-bottom: 4px;
+}
+
+.profile-location {
+  font-size: 0.8rem;
+  color: #a0aec0;
+}
+
+/* SECTIONS */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.section-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* BUDGET CARD */
+.budget-card {
+  background-color: var(--bg-app);
+  padding: 15px;
+  border-radius: 16px;
+}
+
+.budget-text {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.spent { font-size: 1.2rem; font-weight: 800; color: var(--text-main); }
+.total { font-size: 0.9rem; color: #a0aec0; }
+
+.progress-bar-bg {
+  height: 8px;
+  background-color: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--raccoon-orange), var(--raccoon-orange-bright));
+  border-radius: 4px;
+}
+
+.budget-status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.status-good { color: var(--raccoon-green-leaf); font-weight: 600; }
+.status-warning { color: var(--raccoon-orange-bright); font-weight: 600; }
+.percentage { color: #a0aec0; }
+
+/* MINI CALENDAR */
+.mini-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.cal-head {
+  font-size: 0.75rem;
+  color: #a0aec0;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.cal-day {
+  font-size: 0.8rem;
+  color: var(--text-main);
+  padding: 6px 0;
+  border-radius: 8px;
+  cursor: default;
+}
+
+.cal-day.active {
+  background-color: var(--raccoon-orange-bright);
+  color: white;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(254, 107, 64, 0.4);
+}
+
+/* RACCOON TIP */
+.raccoon-tip {
+  background-color: #f0fff4; /* Light Green Tint */
+  border: 1px solid #c6f6d5;
+  padding: 15px;
+  border-radius: 12px;
+  display: flex;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: #276749;
+}
