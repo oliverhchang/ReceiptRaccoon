@@ -1,36 +1,50 @@
 import React from 'react'
 
 export default function ToiletriesTable({ transactions }) {
-  // 1. Flatten all items, filter for "Toiletries"
+  // 1. Flatten all items with extra safety for empty transaction/item lists
   const toiletryItems = []
-  transactions.forEach(t => {
-    t.receipt_items.forEach(item => {
-      if (item.category === "Toiletries/Cleaning") {
-        toiletryItems.push({
-          ...item,
-          purchaseDate: new Date(t.purchase_date),
-          formattedDate: new Date(t.purchase_date).toLocaleDateString()
-        })
-      }
+
+  if (transactions && Array.isArray(transactions)) {
+    transactions.forEach(t => {
+      // Guard against cases where receipt_items might be null
+      const items = t.receipt_items || []
+
+      items.forEach(item => {
+        // Updated to be case-insensitive and match "Toiletries/Cleaning"
+        if (item.category?.toLowerCase().includes("toiletries")) {
+          toiletryItems.push({
+            ...item,
+            purchaseDate: new Date(t.purchase_date),
+            // Ensure date parsing doesn't break UI
+            formattedDate: t.purchase_date ? new Date(t.purchase_date).toLocaleDateString() : 'Unknown Date'
+          })
+        }
+      })
     })
-  })
+  }
 
   // Sort by newest first
   toiletryItems.sort((a,b) => b.purchaseDate - a.purchaseDate)
 
-  // Calculate stats
+  // 2. Calculate stats with Safety Guards
   const today = new Date()
   const rows = toiletryItems.map(item => {
     const diffTime = Math.abs(today - item.purchaseDate)
     const daysSince = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    const costPerDay = daysSince > 0 ? (item.price / daysSince) : item.price
 
-    return { ...item, daysSince, costPerDay }
+    // Safety check: ensure price isn't null and daysSince isn't zero
+    const safePrice = item.price || 0
+    const costPerDay = daysSince > 0 ? (safePrice / daysSince) : safePrice
+
+    return { ...item, daysSince, costPerDay, safePrice }
   })
 
   return (
     <div style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-      <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', color: '#2d3748' }}>Toiletries Tracker</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#2d3748' }}>Toiletries Tracker</h3>
+        <span style={{ fontSize: '0.8rem', color: '#a0aec0' }}>{rows.length} Items Tracked</span>
+      </div>
 
       <table style={{width: '100%', borderCollapse: 'collapse'}}>
         <thead>
@@ -44,7 +58,9 @@ export default function ToiletriesTable({ transactions }) {
         <tbody>
           {rows.map((row, idx) => (
             <tr key={idx} style={{borderBottom: '1px solid #f7fafc', fontSize: '0.95rem', color: '#4a5568'}}>
-              <td style={{padding: '12px', fontWeight: '500'}}>{row.name}</td>
+              <td style={{padding: '12px', fontWeight: '500'}}>
+                {row.name || 'Unknown Product'}
+              </td>
               <td style={{padding: '12px'}}>{row.formattedDate}</td>
               <td style={{padding: '12px'}}>
                 <span style={{
@@ -55,11 +71,19 @@ export default function ToiletriesTable({ transactions }) {
                   {row.daysSince} days
                 </span>
               </td>
-              <td style={{padding: '12px'}}>${row.costPerDay.toFixed(2)}</td>
+              <td style={{padding: '12px'}}>
+                {/* Applied the (value || 0) Safety Guard here */}
+                ${(row.costPerDay || 0).toFixed(2)}
+              </td>
             </tr>
           ))}
           {rows.length === 0 && (
-            <tr><td colSpan={4} style={{padding: '20px', textAlign: 'center', color: '#a0aec0'}}>No toiletries found yet.</td></tr>
+            <tr>
+              <td colSpan={4} style={{padding: '40px', textAlign: 'center', color: '#a0aec0'}}>
+                <div style={{fontSize: '1.5rem', marginBottom: '8px'}}>🦝</div>
+                No toiletries detected in your receipts yet.
+              </td>
+            </tr>
           )}
         </tbody>
       </table>
