@@ -244,14 +244,22 @@
 /* ... existing css ... */
 
 /* New Name Input */
+/* src/components/RightSidebar.css */
+
 .name-input {
-  font-size: 1.2rem;
+  background-color: #ffffff; /* Explicit White Background */
+  color: #2d3748;            /* Dark Grey Text for contrast */
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 1.1rem;
   font-weight: 700;
-  color: #2d3748;
-  border: 1px solid #fe6b40;
-  border-radius: 4px;
-  padding: 2px 4px;
-  width: 140px;
-  text-align: center;
+  width: 150px;              /* Adjust width as needed */
   outline: none;
+  transition: all 0.2s ease;
+}
+
+.name-input:focus {
+  border-color: #fe6b40;     /* Orange highlight when typing */
+  box-shadow: 0 0 0 3px rgba(254, 107, 64, 0.1);
 }
