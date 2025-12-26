@@ -7,6 +7,7 @@ from discord.ext import commands, tasks
 from dotenv import load_dotenv
 import google.generativeai as genai
 from supabase import create_client, Client
+import datetime
 
 # 1. Load Secrets
 load_dotenv()
@@ -37,7 +38,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 VALID_CATEGORIES = [
     "Fruits", "Vegetables", "Meat / Fish", "Dairy & Eggs",
     "Grains & Staples", "Frozen Foods", "Snacks & Sweets",
-    "Condiments & Cooking Ingredients", "Toiletries/Cleaning", "Misc"
+    "Condiments & Cooking Ingredients", "Toiletries", "Misc"
 ]
 
 @bot.event
@@ -198,4 +199,25 @@ async def scheduled_sync():
                         print(f"Failed to sync {member.name}: {e}")
         print("✅ Daily sync complete.")
 
+@tasks.loop(seconds=60)
+async def heartbeat():
+    """Pings Supabase every minute to say 'I am alive'"""
+    try:
+        current_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        supabase.table("system_status").upsert({
+            "service_name": "discord_bot",
+            "last_heartbeat": current_time
+        }).execute()
+        print(f"💓 Heartbeat sent: {current_time}")
+    except Exception as e:
+        print(f"❌ Heartbeat failed: {e}")
+
+# Don't forget to start it in on_ready!
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user}!')
+    if not scheduled_sync.is_running():
+        scheduled_sync.start()
+    if not heartbeat.is_running():  # <--- NEW LINE
+        heartbeat.start()           # <--- NEW LINE
 bot.run(DISCORD_TOKEN)

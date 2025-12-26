@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { LayoutDashboard, TrendingUp, Code, Settings, Search, Bell, ChevronDown } from 'lucide-react'
+// Removed 'Search' from imports
+import { LayoutDashboard, TrendingUp, BookOpen, Settings, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import RightSidebar from '../components/RightSidebar';
 import './DashboardLayout.css'
@@ -9,41 +10,59 @@ export default function DashboardLayout() {
   const [allUsers, setAllUsers] = useState([])
   const [currentUser, setCurrentUser] = useState(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [botOnline, setBotOnline] = useState(false)
 
   useEffect(() => {
     fetchUsers()
+    checkBotStatus()
+    const interval = setInterval(checkBotStatus, 30000)
+    return () => clearInterval(interval)
   }, [])
+
+  async function checkBotStatus() {
+    try {
+      const { data, error } = await supabase
+        .from('system_status')
+        .select('last_heartbeat')
+        .eq('service_name', 'discord_bot')
+        .single()
+
+      if (data && data.last_heartbeat) {
+        const lastSeen = new Date(data.last_heartbeat).getTime()
+        const now = new Date().getTime()
+        const diffMinutes = (now - lastSeen) / 1000 / 60
+        setBotOnline(diffMinutes < 2.5)
+      }
+    } catch (err) {
+      console.error("Status check failed", err)
+      setBotOnline(false)
+    }
+  }
 
   async function fetchUsers() {
     try {
-      // 1. First, get all unique User IDs from the receipts table
-      // This ensures we only care about people who actually uploaded something.
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .select('discord_user_id')
 
       if (receiptError) throw receiptError
 
-      // Extract unique IDs (using Set to remove duplicates)
       const activeUserIds = [...new Set(receiptData.map(r => r.discord_user_id))]
 
       if (activeUserIds.length === 0) {
-        console.log("No receipts found yet.")
         setAllUsers([])
         return
       }
 
-      // 2. Now fetch details ONLY for these specific users
       const { data: activeUsers, error: userError } = await supabase
         .from('users')
         .select('*')
-        .in('discord_id', activeUserIds) // <--- This is the magic filter
+        .in('discord_id', activeUserIds)
 
       if (userError) throw userError
 
       if (activeUsers && activeUsers.length > 0) {
         setAllUsers(activeUsers)
-        // Optional: Keep your current selection if possible, otherwise default to first
         setCurrentUser(prev => prev || activeUsers[0])
       }
 
@@ -73,7 +92,7 @@ export default function DashboardLayout() {
             <TrendingUp size={22} /> Inflation
           </NavLink>
           <NavLink to="/code" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
-            <Code size={22} /> Code Guide
+            <BookOpen size={22} /> Instructions
           </NavLink>
         </nav>
 
@@ -86,15 +105,39 @@ export default function DashboardLayout() {
 
       {/* MAIN AREA */}
       <div className="main-wrapper">
-        <header className="top-header">
-          <div className="search-container">
-            <Search size={20} style={{position: 'absolute', left: '18px', top: '15px', color: '#cbd5e0'}}/>
-            <input type="text" placeholder="Search receipts..." className="search-bar" />
-          </div>
+
+        {/* HEADER: Added justifyContent: 'flex-end' to keep items on the right */}
+        <header className="top-header" style={{ justifyContent: 'flex-end' }}>
+
+          {/* SEARCH CONTAINER REMOVED HERE */}
 
           <div style={{display: 'flex', alignItems: 'center', gap: '20px'}}>
-            <div style={{background: 'white', padding: '10px', borderRadius: '50%', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', cursor: 'pointer'}}>
-              <Bell size={20} color="#a0aec0" />
+
+            {/* BOT STATUS INDICATOR */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              background: 'white',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
+              border: botOnline ? '1px solid #c6f6d5' : '1px solid #fed7d7'
+            }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: botOnline ? '#48bb78' : '#f56565',
+                boxShadow: botOnline ? '0 0 8px #48bb78' : 'none'
+              }}></div>
+              <span style={{
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                color: botOnline ? '#2f855a' : '#c53030'
+              }}>
+                {botOnline ? "Bot Online" : "Bot Offline"}
+              </span>
             </div>
 
             {/* User Dropdown */}
@@ -141,13 +184,13 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        {/* This is where Dashboard, Inflation, etc. will render */}
         <main className="page-content">
           <Outlet context={{ currentUser }} />
         </main>
       </div>
 
       <RightSidebar currentUser={currentUser} />
+
     </div>
   )
 }

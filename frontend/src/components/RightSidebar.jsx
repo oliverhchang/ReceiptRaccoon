@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Calendar as CalendarIcon, TrendingUp, ChevronLeft, ChevronRight, Edit2, Check, X } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import './RightSidebar.css'
+import MonthlyComparison from './DashboardWidgets/MonthlyComparison' // <--- 1. NEW IMPORT
 
 export default function RightSidebar({ currentUser }) {
   const [loading, setLoading] = useState(false)
@@ -25,7 +26,6 @@ export default function RightSidebar({ currentUser }) {
   useEffect(() => {
     if (currentUser) {
       fetchUserStats()
-      // Initialize edit states
       setNewName(currentUser.display_name)
     }
   }, [currentUser, viewDate])
@@ -39,7 +39,7 @@ export default function RightSidebar({ currentUser }) {
     const endOfMonth = new Date(year, month + 1, 0).toISOString()
 
     try {
-      // 1. Fetch Receipts
+      // 1. Fetch Receipts for Calendar & Total
       const { data: receipts, error: receiptError } = await supabase
         .from('receipts')
         .select('total_amount, purchase_date')
@@ -108,8 +108,6 @@ export default function RightSidebar({ currentUser }) {
 
       if (error) throw error
 
-      // Note: This updates the local view immediately,
-      // but you might need to refresh the page to see it update in the top-right dropdown.
       currentUser.display_name = newName
       setIsEditingName(false)
 
@@ -156,13 +154,12 @@ export default function RightSidebar({ currentUser }) {
   return (
     <aside className="right-sidebar">
 
-      {/* PROFILE */}
+      {/* 1. PROFILE */}
       <div className="profile-card">
         <div className="profile-header">
           <img src={currentUser.avatar_url} alt="Profile" className="profile-avatar-large" />
 
           <div className="profile-info">
-
             {/* NAME EDIT SECTION */}
             <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '32px'}}>
               {isEditingName ? (
@@ -180,11 +177,7 @@ export default function RightSidebar({ currentUser }) {
               ) : (
                 <>
                   <h3>{currentUser.display_name}</h3>
-                  <button
-                    onClick={() => setIsEditingName(true)}
-                    className="icon-btn"
-                    title="Edit Name"
-                  >
+                  <button onClick={() => setIsEditingName(true)} className="icon-btn" title="Edit Name">
                     <Edit2 size={12} />
                   </button>
                 </>
@@ -198,7 +191,7 @@ export default function RightSidebar({ currentUser }) {
         </div>
       </div>
 
-      {/* BUDGET */}
+      {/* 2. BUDGET */}
       <div className="sidebar-section">
         <div className="section-header">
           <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
@@ -253,7 +246,10 @@ export default function RightSidebar({ currentUser }) {
         </div>
       </div>
 
-      {/* CALENDAR */}
+      {/* 3. MONTHLY COMPARISON (NEW WIDGET) */}
+      {currentUser && <MonthlyComparison currentUser={currentUser} />}
+
+      {/* 4. CALENDAR */}
       <div className="sidebar-section">
         <div className="section-header">
            <h4 style={{margin: 0}}>Grocery Trips</h4>
