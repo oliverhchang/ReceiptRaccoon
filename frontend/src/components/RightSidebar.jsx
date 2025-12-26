@@ -1,8 +1,9 @@
+// src/components/RightSidebar.jsx
 import React, { useEffect, useState } from 'react'
-import { Calendar as CalendarIcon, TrendingUp, ChevronLeft, ChevronRight, Edit2, Check, X } from 'lucide-react'
+import { Calendar as CalendarIcon, TrendingUp, ChevronLeft, ChevronRight, Edit2, Check, X, RotateCcw } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import './RightSidebar.css'
-import MonthlyComparison from './DashboardWidgets/MonthlyComparison' // <--- 1. NEW IMPORT
+import MonthlyComparison from './DashboardWidgets/MonthlyComparison'
 
 export default function RightSidebar({ currentUser }) {
   const [loading, setLoading] = useState(false)
@@ -22,7 +23,6 @@ export default function RightSidebar({ currentUser }) {
     receiptDays: []
   })
 
-  // Re-fetch whenever User or Date changes
   useEffect(() => {
     if (currentUser) {
       fetchUserStats()
@@ -32,14 +32,12 @@ export default function RightSidebar({ currentUser }) {
 
   async function fetchUserStats() {
     setLoading(true)
-
     const year = viewDate.getFullYear()
     const month = viewDate.getMonth()
     const startOfMonth = new Date(year, month, 1).toISOString()
     const endOfMonth = new Date(year, month + 1, 0).toISOString()
 
     try {
-      // 1. Fetch Receipts for Calendar & Total
       const { data: receipts, error: receiptError } = await supabase
         .from('receipts')
         .select('total_amount, purchase_date')
@@ -49,7 +47,6 @@ export default function RightSidebar({ currentUser }) {
 
       if (receiptError) console.error(receiptError)
 
-      // 2. Fetch User's Budget
       const { data: userData } = await supabase
         .from('users')
         .select('monthly_budget')
@@ -57,8 +54,6 @@ export default function RightSidebar({ currentUser }) {
         .single()
 
       const currentBudget = userData?.monthly_budget || 2000
-
-      // 3. Process Totals
       const totalSpent = receipts?.reduce((sum, r) => sum + (r.total_amount || 0), 0) || 0
 
       const days = receipts?.map(r => {
@@ -71,9 +66,7 @@ export default function RightSidebar({ currentUser }) {
         budget: currentBudget,
         receiptDays: days
       })
-
       setNewBudget(currentBudget)
-
     } catch (err) {
       console.error(err)
     } finally {
@@ -81,17 +74,13 @@ export default function RightSidebar({ currentUser }) {
     }
   }
 
-  // --- SAVE FUNCTIONS ---
-
   async function saveBudget() {
     try {
       const { error } = await supabase
         .from('users')
         .update({ monthly_budget: newBudget })
         .eq('discord_id', currentUser.discord_id)
-
       if (error) throw error
-
       setStats(prev => ({ ...prev, budget: newBudget }))
       setIsEditingBudget(false)
     } catch (error) {
@@ -105,12 +94,9 @@ export default function RightSidebar({ currentUser }) {
         .from('users')
         .update({ display_name: newName })
         .eq('discord_id', currentUser.discord_id)
-
       if (error) throw error
-
       currentUser.display_name = newName
       setIsEditingName(false)
-
     } catch (error) {
       console.error("Error saving name:", error)
     }
@@ -123,6 +109,11 @@ export default function RightSidebar({ currentUser }) {
     setViewDate(newDate)
   }
 
+  // NEW: GO TO TODAY FUNCTION
+  const goToToday = () => {
+    setViewDate(new Date())
+  }
+
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
   const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay()
 
@@ -130,11 +121,9 @@ export default function RightSidebar({ currentUser }) {
     const daysInMonth = getDaysInMonth(viewDate)
     const startDay = getFirstDayOfMonth(viewDate)
     const cells = []
-
     for (let i = 0; i < startDay; i++) {
       cells.push(<div key={`empty-${i}`} className="cal-day empty"></div>)
     }
-
     for (let d = 1; d <= daysInMonth; d++) {
       const hasReceipt = stats.receiptDays.includes(d)
       cells.push(
@@ -153,24 +142,15 @@ export default function RightSidebar({ currentUser }) {
 
   return (
     <aside className="right-sidebar">
-
       {/* 1. PROFILE */}
       <div className="profile-card">
         <div className="profile-header">
           <img src={currentUser.avatar_url} alt="Profile" className="profile-avatar-large" />
-
           <div className="profile-info">
-            {/* NAME EDIT SECTION */}
             <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '32px'}}>
               {isEditingName ? (
                 <>
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="name-input"
-                    autoFocus
-                  />
+                  <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="name-input" autoFocus />
                   <button onClick={saveName} className="action-btn save"><Check size={14}/></button>
                   <button onClick={() => setIsEditingName(false)} className="action-btn cancel"><X size={14}/></button>
                 </>
@@ -183,7 +163,6 @@ export default function RightSidebar({ currentUser }) {
                 </>
               )}
             </div>
-
             <span className="profile-handle">
                 @{currentUser.handle || currentUser.display_name.toLowerCase().replace(/\s/g, '')}
             </span>
@@ -204,7 +183,6 @@ export default function RightSidebar({ currentUser }) {
           </div>
           <TrendingUp size={16} color="#fe6b40" />
         </div>
-
         <div className="budget-card">
           <div className="budget-text">
             <span className="spent">
@@ -215,13 +193,7 @@ export default function RightSidebar({ currentUser }) {
                {isEditingBudget ? (
                  <>
                    <span style={{fontSize: '1rem', color: '#a0aec0'}}>$</span>
-                   <input
-                      type="number"
-                      value={newBudget}
-                      onChange={(e) => setNewBudget(Number(e.target.value))}
-                      className="budget-input"
-                      autoFocus
-                   />
+                   <input type="number" value={newBudget} onChange={(e) => setNewBudget(Number(e.target.value))} className="budget-input" autoFocus />
                    <button onClick={saveBudget} className="action-btn save"><Check size={14}/></button>
                    <button onClick={() => setIsEditingBudget(false)} className="action-btn cancel"><X size={14}/></button>
                  </>
@@ -230,29 +202,51 @@ export default function RightSidebar({ currentUser }) {
                )}
             </span>
           </div>
-
           <div className="progress-bar-bg">
-            <div
-              className="progress-bar-fill"
-              style={{
-                  width: `${percentSpent}%`,
-                  backgroundColor: percentSpent > 90 ? '#ef4444' : '#fe6b40'
-              }}
-            ></div>
+            <div className="progress-bar-fill" style={{ width: `${percentSpent}%`, backgroundColor: percentSpent > 90 ? '#ef4444' : '#fe6b40' }}></div>
           </div>
-          <div style={{fontSize: '0.8rem', color: '#a0aec0', marginTop: '8px', textAlign: 'right'}}>
-            {Math.round(percentSpent)}% used
-          </div>
+          <div style={{fontSize: '0.8rem', color: '#a0aec0', marginTop: '8px', textAlign: 'right'}}>{Math.round(percentSpent)}% used</div>
         </div>
       </div>
 
-      {/* 3. MONTHLY COMPARISON (NEW WIDGET) */}
+      {/* 3. MONTHLY COMPARISON */}
       {currentUser && <MonthlyComparison currentUser={currentUser} />}
 
       {/* 4. CALENDAR */}
       <div className="sidebar-section">
         <div className="section-header">
            <h4 style={{margin: 0}}>Grocery Trips</h4>
+
+           {/* EXPLICIT TODAY BUTTON */}
+           <button
+             onClick={goToToday}
+             style={{
+               marginLeft: 'auto',
+               marginRight: '12px',
+               padding: '2px 8px',
+               fontSize: '0.7rem',
+               fontWeight: '700',
+               textTransform: 'uppercase',
+               letterSpacing: '0.5px',
+               color: '#fe6b40',
+               background: '#fff5f0',
+               border: '1px solid #fe6b40',
+               borderRadius: '4px',
+               cursor: 'pointer',
+               transition: 'all 0.2s'
+             }}
+             onMouseOver={(e) => {
+               e.currentTarget.style.background = '#fe6b40';
+               e.currentTarget.style.color = '#ffffff';
+             }}
+             onMouseOut={(e) => {
+               e.currentTarget.style.background = '#fff5f0';
+               e.currentTarget.style.color = '#fe6b40';
+             }}
+           >
+             Today
+           </button>
+
            <CalendarIcon size={16} color="#a0aec0" />
         </div>
 
@@ -269,7 +263,6 @@ export default function RightSidebar({ currentUser }) {
           {renderCalendarDays()}
         </div>
       </div>
-
     </aside>
   )
 }

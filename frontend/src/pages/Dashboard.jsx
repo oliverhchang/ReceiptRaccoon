@@ -16,7 +16,6 @@ export default function Dashboard() {
   const { currentUser } = useOutletContext()
   const [loading, setLoading] = useState(true)
   const [transactions, setTransactions] = useState([])
-
   const [pieData, setPieData] = useState([])
   const [kpi, setKpi] = useState({ lastDate: '-', count: 0, avg: 0 })
 
@@ -41,17 +40,34 @@ export default function Dashboard() {
       if (receipts && receipts.length > 0) {
         setTransactions(receipts)
 
-        // KPI CALCS
+        // 1. Calculate Total Spent
         const totalSpent = receipts.reduce((sum, r) => sum + (r.total_amount || 0), 0)
-        const lastReceipt = receipts[receipts.length - 1]
+
+        // 2. FIND THE LATEST DATE MANUALLY
+        // We iterate through all receipts to find the actual maximum date string
+        let latestDateStr = '';
+        receipts.forEach(r => {
+          if (r.purchase_date && (!latestDateStr || r.purchase_date > latestDateStr)) {
+            latestDateStr = r.purchase_date;
+          }
+        });
+
+        let displayDate = '-'
+        if (latestDateStr) {
+          // Splitting ensures no timezone shifts; YYYY-MM-DD -> MM/DD/YYYY
+          const [year, month, day] = latestDateStr.split('-')
+          if (year && month && day) {
+            displayDate = `${month}/${day}/${year}`
+          }
+        }
 
         setKpi({
-          lastDate: new Date(lastReceipt.purchase_date).toLocaleDateString(),
+          lastDate: displayDate,
           count: receipts.length,
           avg: totalSpent / receipts.length
         })
 
-        // PIE CHART DATA
+        // 3. Category Pie Chart Processing
         const catMap = {}
         receipts.forEach(receipt => {
           receipt.receipt_items.forEach(item => {
@@ -63,6 +79,7 @@ export default function Dashboard() {
         setPieData(Object.keys(catMap).map(cat => ({ name: cat, value: catMap[cat] })))
       } else {
         setTransactions([])
+        setKpi({ lastDate: '-', count: 0, avg: 0 })
       }
 
     } catch (err) {
@@ -93,37 +110,26 @@ export default function Dashboard() {
         <SpendingTrendWithBreakdown transactions={transactions} />
       </div>
 
-
-      {/* --- SECTION 2: DETAILED ANALYSIS (Reordered) --- */}
       <h2 style={{fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', marginBottom: '24px'}}>Spending Analysis</h2>
 
-      {/* 1. Category Line Chart (Now on Top) */}
       <div style={{marginBottom: '24px'}}>
          <CategoryLineChart transactions={transactions} />
       </div>
 
-      {/* 2. Side-by-Side: Stores & Category Pie (Now Below) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '60px' }}>
         <StoreBarChart transactions={transactions} />
         <CategoryPieChart data={pieData} />
       </div>
 
-
-      {/* --- SECTION 3: FREQUENCY TRACKER --- */}
       <h2 style={{fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', marginBottom: '24px'}}>Frequency Tracker</h2>
       <div style={{marginBottom: '60px'}}>
         <ToiletriesTable transactions={transactions} />
       </div>
 
-
-      {/* --- SECTION 4: RECENT TRANSACTIONS (Moved to Bottom) --- */}
       <h2 style={{fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', marginBottom: '24px'}}>Recent Activity</h2>
       <div style={{marginBottom: '24px'}}>
         <RecentTransactionsTable transactions={transactions} />
       </div>
-
-
-
     </div>
   )
 }
