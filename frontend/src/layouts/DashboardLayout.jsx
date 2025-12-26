@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-// Removed 'Search' from imports
-import { LayoutDashboard, TrendingUp, BookOpen, Settings, ChevronDown } from 'lucide-react'
+// Added 'Cpu' to imports for the explanation icon
+import { LayoutDashboard, TrendingUp, BookOpen, Settings, ChevronDown, Cpu } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import RightSidebar from '../components/RightSidebar';
 import './DashboardLayout.css'
@@ -81,7 +81,15 @@ export default function DashboardLayout() {
       {/* LEFT SIDEBAR */}
       <aside className="sidebar">
         <div className="logo-container">
-          <span>Receipt Raccoon</span>
+          {/* UPDATED LOGO STYLING */}
+          <span style={{
+            fontSize: '1.6rem',
+            fontWeight: '800',
+            color: '#fe6b40',
+            letterSpacing: '-0.5px'
+          }}>
+            Receipt Raccoon
+          </span>
         </div>
 
         <nav style={{display: 'flex', flexDirection: 'column'}}>
@@ -94,6 +102,11 @@ export default function DashboardLayout() {
           <NavLink to="/code" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <BookOpen size={22} /> Instructions
           </NavLink>
+
+          {/* NEW CODE EXPLANATION LINK */}
+          <NavLink to="/explanation" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
+            <Cpu size={22} /> Code Explanation
+          </NavLink>
         </nav>
 
         <div style={{marginTop: 'auto'}}>
@@ -105,12 +118,7 @@ export default function DashboardLayout() {
 
       {/* MAIN AREA */}
       <div className="main-wrapper">
-
-        {/* HEADER: Added justifyContent: 'flex-end' to keep items on the right */}
         <header className="top-header" style={{ justifyContent: 'flex-end' }}>
-
-          {/* SEARCH CONTAINER REMOVED HERE */}
-
           <div style={{display: 'flex', alignItems: 'center', gap: '20px'}}>
 
             {/* BOT STATUS INDICATOR */}
@@ -190,7 +198,6 @@ export default function DashboardLayout() {
       </div>
 
       <RightSidebar currentUser={currentUser} />
-
     </div>
   )
 }

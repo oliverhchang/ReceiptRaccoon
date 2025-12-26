@@ -5,7 +5,8 @@ import DashboardLayout from './layouts/DashboardLayout'
 import Dashboard from './pages/Dashboard'
 import Inflation from './pages/Inflation'
 import Instructions from './pages/Instructions'
-import Settings from './pages/Settings' // <--- 1. IMPORT YOUR NEW SETTINGS PAGE
+import Settings from './pages/Settings'
+import CodeExplanation from './pages/CodeExplanation' // <--- 1. IMPORT THE NEW PAGE
 
 export default function App() {
   return (
@@ -16,7 +17,8 @@ export default function App() {
           <Route path="inflation" element={<Inflation />} />
           <Route path="code" element={<Instructions />} />
 
-          {/* 2. ADD THIS ROUTE HERE */}
+          <Route path="explanation" element={<CodeExplanation />} />
+
           <Route path="settings" element={<Settings />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
