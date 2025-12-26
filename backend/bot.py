@@ -21,7 +21,7 @@ genai.configure(api_key=GEMINI_KEY)
 
 # Force JSON output for receipt extraction
 model = genai.GenerativeModel(
-    'gemini-1.5-flash',  # Corrected model name from 2.5 (typo) to 1.5
+    'gemini-2.5-flash',
     generation_config={"response_mime_type": "application/json"}
 )
 
