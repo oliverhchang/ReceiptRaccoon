@@ -1,144 +1,257 @@
 /* src/components/RightSidebar.css */
 
 .right-sidebar {
-  width: 300px;
-  background-color: var(--bg-surface);
-  padding: 30px 20px;
+  width: 320px;
+  background-color: #ffffff;
+  border-left: 1px solid #edf2f7;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 30px;
-  /* Left Shadow to separate from content */
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.02);
-  z-index: 10;
+  gap: 32px;
+  height: 100vh;
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
-/* PROFILE CARD */
+/* --- 1. PROFILE CARD --- */
 .profile-card {
   text-align: center;
+  margin-bottom: 10px;
+}
+
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
 .profile-avatar-large {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  border: 4px solid #fff5f0; /* Orange Tint Ring */
-  margin-bottom: 12px;
+  object-fit: cover;
+  border: 4px solid #fff5f0; /* Light orange border */
 }
 
 .profile-info h3 {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text-main);
+  font-size: 1.2rem;
+  color: #2d3748;
 }
 
 .profile-handle {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--raccoon-orange);
-  margin-bottom: 4px;
+  font-size: 0.9rem;
+  color: #718096;
 }
 
-.profile-location {
-  font-size: 0.8rem;
-  color: #a0aec0;
+/* --- 2. SECTIONS GENERIC --- */
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-/* SECTIONS */
 .section-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  justify-content: space-between;
 }
 
 .section-header h4 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-main);
+  color: #2d3748;
 }
 
-/* BUDGET CARD */
+/* --- 3. BUDGET CARD & EDITING --- */
 .budget-card {
-  background-color: var(--bg-app);
-  padding: 15px;
-  border-radius: 16px;
+  background-color: #f8fafc;
+  padding: 16px;
+  border-radius: 12px;
 }
 
 .budget-text {
   display: flex;
   align-items: baseline;
-  gap: 4px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
-.spent { font-size: 1.2rem; font-weight: 800; color: var(--text-main); }
-.total { font-size: 0.9rem; color: #a0aec0; }
+.spent {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #2d3748;
+}
+
+.total {
+  font-size: 0.9rem;
+  color: #a0aec0;
+  margin-left: 4px;
+}
 
 .progress-bar-bg {
+  width: 100%;
   height: 8px;
-  background-color: #e2e8f0;
+  background-color: #edf2f7;
   border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 8px;
 }
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--raccoon-orange), var(--raccoon-orange-bright));
+  background-color: #fe6b40;
   border-radius: 4px;
+  transition: width 0.5s ease;
 }
 
-.budget-status {
+/* Edit Controls */
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #cbd5e0;
+  padding: 4px;
+  border-radius: 4px;
   display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
+  align-items: center;
+  transition: all 0.2s;
 }
 
-.status-good { color: var(--raccoon-green-leaf); font-weight: 600; }
-.status-warning { color: var(--raccoon-orange-bright); font-weight: 600; }
-.percentage { color: #a0aec0; }
+.icon-btn:hover {
+  background-color: #edf2f7;
+  color: #fe6b40;
+}
 
-/* MINI CALENDAR */
+.budget-input {
+  width: 80px;
+  padding: 2px 4px;
+  border: 1px solid #fe6b40;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #4a5568;
+  outline: none;
+  background: white;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+}
+
+.action-btn.save {
+  color: #48bb78; /* Green */
+  background: #f0fff4;
+}
+
+.action-btn.cancel {
+  color: #f56565; /* Red */
+  background: #fff5f5;
+}
+
+.action-btn:hover {
+  filter: brightness(0.95);
+}
+
+/* --- 4. CALENDAR --- */
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  background-color: #f8fafc;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+/* Forces the label to take up center space */
+.month-label-container {
+  flex-grow: 1;
+  text-align: center;
+}
+
+.month-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #a0aec0;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.nav-btn:hover {
+  background-color: #edf2f7;
+  color: #fe6b40;
+}
+
 .mini-calendar {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
+  gap: 4px;
   text-align: center;
 }
 
 .cal-head {
   font-size: 0.75rem;
-  color: #a0aec0;
+  color: #cbd5e0;
   font-weight: 600;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .cal-day {
   font-size: 0.8rem;
-  color: var(--text-main);
-  padding: 6px 0;
+  color: #4a5568;
+  padding: 6px;
   border-radius: 8px;
   cursor: default;
+  transition: all 0.2s;
 }
 
+.cal-day.empty {
+  background: transparent;
+  pointer-events: none;
+}
+
+/* Orange Active Day */
 .cal-day.active {
-  background-color: var(--raccoon-orange-bright);
+  background-color: #fe6b40;
   color: white;
   font-weight: bold;
-  box-shadow: 0 2px 8px rgba(254, 107, 64, 0.4);
+  box-shadow: 0 4px 10px rgba(254, 107, 64, 0.3);
 }
 
-/* RACCOON TIP */
-.raccoon-tip {
-  background-color: #f0fff4; /* Light Green Tint */
-  border: 1px solid #c6f6d5;
-  padding: 15px;
-  border-radius: 12px;
-  display: flex;
-  gap: 12px;
-  font-size: 0.85rem;
-  color: #276749;
+.cal-day:hover:not(.empty):not(.active) {
+  background-color: #f7fafc;
+}
+
+/* ... existing css ... */
+
+/* New Name Input */
+.name-input {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #2d3748;
+  border: 1px solid #fe6b40;
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: 140px;
+  text-align: center;
+  outline: none;
 }

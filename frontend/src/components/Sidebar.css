@@ -1,0 +1,55 @@
+.sidebar {
+  width: 250px;
+  background-color: #ffffff;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #f0f0f0;
+  padding: 1.5rem;
+  position: fixed;
+  left: 0;
+  top: 0;
+}
+
+.sidebar-logo h2 {
+  color: #ff6b40; /* Raccoon Orange */
+  font-family: 'Brush Script MT', cursive; /* Or your specific font */
+  font-size: 1.8rem;
+  margin-bottom: 2rem;
+}
+
+.sidebar-menu {
+  list-style: none;
+  padding: 0;
+  flex-grow: 1;
+}
+
+.sidebar-menu li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sidebar-menu li:hover {
+  background-color: #fff0eb;
+  color: #ff6b40;
+}
+
+.sidebar-menu li.active {
+  background-color: #ff6b40;
+  color: white;
+  box-shadow: 0 4px 12px rgba(255, 107, 64, 0.2);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 1rem;
+  color: #64748b;
+}

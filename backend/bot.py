@@ -1,9 +1,9 @@
 import os
 import discord
-import io
 import json
 import uuid
-from discord.ext import commands
+import asyncio
+from discord.ext import commands, tasks
 from dotenv import load_dotenv
 import google.generativeai as genai
 from supabase import create_client, Client
@@ -16,14 +16,21 @@ SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 
 # 2. Setup Services
-# Using the new 2.5 Flash model for better vision/speed
 genai.configure(api_key=GEMINI_KEY)
+
+# Using generation_config to force JSON output
 model = genai.GenerativeModel(
-    'gemini-1.5-flash')  # Note: 2.5 is not fully public yet, falling back to 1.5-flash usually safer, but if 2.5 works for you keep it!
+    'gemini-2.5-flash',
+    generation_config={"response_mime_type": "application/json"}
+)
+
+# Ensure your SUPABASE_KEY is the "service_role" key if you want to bypass RLS,
+# otherwise ensure RLS policies allow anon inserts.
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True # REQUIRED to loop through guild.members
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Your Custom Categories
@@ -33,14 +40,40 @@ VALID_CATEGORIES = [
     "Condiments & Cooking Ingredients", "Toiletries/Cleaning", "Misc"
 ]
 
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user}!')
+    # Start the daily loop if it isn't already running
+    if not scheduled_sync.is_running():
+        scheduled_sync.start()
+
+# --- NEW: Manual Sync Command ---
+@bot.command(name='sync')
+async def sync_profile(ctx):
+    """Manually updates the user's profile immediately"""
+    msg = await ctx.send("🔄 Syncing profile...")
+    try:
+        user_data = {
+            "discord_id": str(ctx.author.id),
+            "display_name": ctx.author.display_name,
+            "handle": ctx.author.name, # Syncs real username
+            "avatar_url": str(ctx.author.display_avatar.url)
+        }
+        supabase.table("users").upsert(user_data).execute()
+        await msg.edit(content=f"✅ **Synced!** Handle updated to: @{ctx.author.name}")
+    except Exception as e:
+        await msg.edit(content=f"❌ Error: {e}")
 
 @bot.event
 async def on_message(message):
-    if message.author == bot.user: return
+    if message.author == bot.user:
+        return
 
+    # Check for image attachments
     if message.attachments:
         attachment = message.attachments[0]
-        if any(attachment.filename.lower().endswith(ext) for ext in ['png', 'jpg', 'jpeg', 'webp']):
+        # Basic check for image types
+        if attachment.content_type and attachment.content_type.startswith('image/'):
 
             status_msg = await message.channel.send("👀 Processing Receipt (Full Image)...")
 
@@ -49,85 +82,72 @@ async def on_message(message):
                 image_bytes = await attachment.read()
 
                 # B. Upload Image to Supabase Storage
-                file_name = f"{uuid.uuid4()}.jpg"
+                file_ext = attachment.filename.split('.')[-1]
+                file_name = f"{uuid.uuid4()}.{file_ext}"
+
                 supabase.storage.from_("receipts").upload(
                     file=image_bytes,
                     path=file_name,
-                    file_options={"content-type": "image/jpeg"}
+                    file_options={"content-type": attachment.content_type}
                 )
+
                 image_url = supabase.storage.from_("receipts").get_public_url(file_name)
 
-                # C. Analyze with Gemini (Vision)
+                # C. Analyze with Gemini
                 prompt = f"""
-                                Analyze this receipt image. Extract items into strict JSON format.
+                Analyze this receipt image. Extract data into this JSON schema:
+                {{
+                    "store": str,
+                    "address": str,
+                    "date": "YYYY-MM-DD",
+                    "total": float,
+                    "items": [
+                        {{"name": str, "price": float, "category": str}}
+                    ]
+                }}
 
-                                VALID CATEGORIES LIST:
-                                {json.dumps(VALID_CATEGORIES)}
+                RULES:
+                1. For 'category', use EXACTLY one of: {json.dumps(VALID_CATEGORIES)}
+                2. If an item doesn't fit, use "Grains & Staples" or "Snacks & Sweets".
+                3. If date is missing, use null.
+                """
 
-                                OUTPUT FORMAT:
-                                {{
-                                    "store": "Store Name",
-                                    "address": "Address or City",
-                                    "date": "YYYY-MM-DD",
-                                    "total": 12.34,
-                                    "items": [
-                                        {{"name": "Item Name", "price": 0.00, "category": "Category from LIST"}}
-                                    ]
-                                }}
+                response = await asyncio.to_thread(
+                    model.generate_content,
+                    [prompt, {"mime_type": attachment.content_type, "data": image_bytes}]
+                )
 
-                                CRITICAL RULES:
-                                1. You MUST categorize each item into one of the VALID CATEGORIES listed above.
-                                2. Do NOT use generic terms like "Food" or "Groceries".
-                                3. If 'Cucumber', label as 'Vegetables'. If 'Steak', label as 'Meat / Fish'.
-                                4. If an item is ambiguous, choose the closest match or use 'Misc'.
-                                5. Return ONLY valid JSON.
-                                """
+                data = json.loads(response.text)
 
-                response = model.generate_content([
-                    prompt,
-                    {"mime_type": "image/jpeg", "data": image_bytes}
-                ])
-
-                # Clean up response
-                raw_text = response.text.replace("```json", "").replace("```", "").strip()
-                data = json.loads(raw_text)
-
-                if "error" in data:
-                    await status_msg.edit(content="❌ I couldn't read that receipt.")
-                    return
-
-                # D. Update/Create the User (The "Lazy Update" Strategy)
-                # ---------------------------------------------------------
-                # This makes sure the user exists in the 'users' table
-                # and keeps their avatar/name fresh.
+                # D. Update User (Lazy Update)
+                # UPDATED: Now includes 'handle'
                 user_data = {
                     "discord_id": str(message.author.id),
                     "display_name": message.author.display_name,
-                    "avatar_url": str(message.author.display_avatar.url),
-                    # We don't update 'monthly_budget' here so we don't overwrite your settings
+                    "handle": message.author.name, # <--- NEW
+                    "avatar_url": str(message.author.display_avatar.url)
                 }
 
-                # .upsert() means: "Insert if new, Update if exists"
                 supabase.table("users").upsert(user_data).execute()
-                # ---------------------------------------------------------
 
-                # E. Save to Database (Split into 2 steps!)
-
-                # Step 1: Save the Receipt Wrapper
+                # E. Save Receipt
                 receipt_entry = {
                     "discord_user_id": str(message.author.id),
                     "store_name": data.get("store", "Unknown Store"),
-                    "store_address": data.get("address", None),
-                    "purchase_date": data.get("date", None),
+                    "store_address": data.get("address"),
+                    "purchase_date": data.get("date"),
                     "total_amount": data.get("total", 0.0),
                     "image_url": image_url
                 }
 
-                # Insert and get the new ID back
                 response_db = supabase.table("receipts").insert(receipt_entry).execute()
+
+                if not response_db.data:
+                    raise Exception("Database Insert failed or returned no ID.")
+
                 new_receipt_id = response_db.data[0]['id']
 
-                # Step 2: Save the Items linked to that ID
+                # F. Save Items
                 items_to_insert = []
                 for item in data.get("items", []):
                     items_to_insert.append({
@@ -140,19 +160,42 @@ async def on_message(message):
                 if items_to_insert:
                     supabase.table("receipt_items").insert(items_to_insert).execute()
 
-                # F. Success Message
+                # G. Success Message
                 display_date = data.get('date', 'Unknown Date')
                 item_count = len(items_to_insert)
 
                 await status_msg.edit(
-                    content=f"✅ **Saved!**\n📅 {display_date} • 🏪 {data['store']}\n💰 ${data['total']} • 🧾 {item_count} items categorized!"
+                    content=f"✅ **Saved!**\n📅 {display_date} • 🏪 {data.get('store', 'Unknown')}\n💰 ${data.get('total', 0)} • 🧾 {item_count} items categorized!"
                 )
 
+            except json.JSONDecodeError:
+                await status_msg.edit(content="❌ AI Error: The model failed to generate valid JSON.")
             except Exception as e:
-                await status_msg.edit(content=f"❌ Error: {str(e)}")
-                print(e)
+                await status_msg.edit(content=f"❌ System Error: {str(e)}")
+                print(f"Error processing receipt: {e}")
 
     await bot.process_commands(message)
 
+# --- DAILY BACKGROUND TASK ---
+@tasks.loop(hours=24)
+async def scheduled_sync():
+    """Runs once a day to update everyone's profiles"""
+    print("⏰ Running daily profile sync...")
+    if bot.guilds:
+        # Assuming single server for now, or loop through all guilds
+        for guild in bot.guilds:
+            for member in guild.members:
+                if not member.bot:
+                    user_data = {
+                        "discord_id": str(member.id),
+                        "display_name": member.display_name,
+                        "handle": member.name, # <--- NEW: Saves 'oliverhchang'
+                        "avatar_url": str(member.display_avatar.url)
+                    }
+                    try:
+                        supabase.table("users").upsert(user_data).execute()
+                    except Exception as e:
+                        print(f"Failed to sync {member.name}: {e}")
+        print("✅ Daily sync complete.")
 
 bot.run(DISCORD_TOKEN)

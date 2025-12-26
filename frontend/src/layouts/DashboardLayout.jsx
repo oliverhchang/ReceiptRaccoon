@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 import { LayoutDashboard, TrendingUp, Code, Settings, Search, Bell, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import RightSidebar from '../components/RightSidebar' // We will pass the user to this!
+import RightSidebar from '../components/RightSidebar';
 import './DashboardLayout.css'
 
 export default function DashboardLayout() {
@@ -15,13 +15,40 @@ export default function DashboardLayout() {
   }, [])
 
   async function fetchUsers() {
-    // 1. Get everyone from the 'users' table
-    const { data, error } = await supabase.from('users').select('*')
-    if (error) console.error("Error fetching users:", error)
+    try {
+      // 1. First, get all unique User IDs from the receipts table
+      // This ensures we only care about people who actually uploaded something.
+      const { data: receiptData, error: receiptError } = await supabase
+        .from('receipts')
+        .select('discord_user_id')
 
-    if (data && data.length > 0) {
-      setAllUsers(data)
-      setCurrentUser(data[0]) // Default to the first user found
+      if (receiptError) throw receiptError
+
+      // Extract unique IDs (using Set to remove duplicates)
+      const activeUserIds = [...new Set(receiptData.map(r => r.discord_user_id))]
+
+      if (activeUserIds.length === 0) {
+        console.log("No receipts found yet.")
+        setAllUsers([])
+        return
+      }
+
+      // 2. Now fetch details ONLY for these specific users
+      const { data: activeUsers, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .in('discord_id', activeUserIds) // <--- This is the magic filter
+
+      if (userError) throw userError
+
+      if (activeUsers && activeUsers.length > 0) {
+        setAllUsers(activeUsers)
+        // Optional: Keep your current selection if possible, otherwise default to first
+        setCurrentUser(prev => prev || activeUsers[0])
+      }
+
+    } catch (error) {
+      console.error("Error fetching active users:", error)
     }
   }
 
@@ -32,7 +59,6 @@ export default function DashboardLayout() {
 
   return (
     <div className="app-container">
-
       {/* LEFT SIDEBAR */}
       <aside className="sidebar">
         <div className="logo-container">
@@ -60,8 +86,6 @@ export default function DashboardLayout() {
 
       {/* MAIN AREA */}
       <div className="main-wrapper">
-
-        {/* TOP HEADER */}
         <header className="top-header">
           <div className="search-container">
             <Search size={20} style={{position: 'absolute', left: '18px', top: '15px', color: '#cbd5e0'}}/>
@@ -73,45 +97,29 @@ export default function DashboardLayout() {
               <Bell size={20} color="#a0aec0" />
             </div>
 
-            {/* --- USER SWITCHER DROPDOWN --- */}
+            {/* User Dropdown */}
             <div style={{position: 'relative'}}>
-
-              {/* The Clickable "Pill" */}
-              <div
-                className="user-profile"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              >
+              <div className="user-profile" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
                 <div style={{textAlign: 'right'}}>
                   <div style={{fontWeight: '700', fontSize: '0.9rem', color: '#2d3748'}}>
                     {currentUser ? currentUser.display_name : "Loading..."}
                   </div>
                   <div style={{fontSize: '0.75rem', color: '#a0aec0'}}>Switch User</div>
                 </div>
-
                 {currentUser ? (
-                  <img
-                    src={currentUser.avatar_url}
-                    alt="avatar"
-                    className="avatar"
-                    style={{objectFit: 'cover'}}
-                  />
+                  <img src={currentUser.avatar_url} alt="avatar" className="avatar" style={{objectFit: 'cover'}} />
                 ) : (
                   <div className="avatar">?</div>
                 )}
-
                 <ChevronDown size={16} color="#a0aec0" style={{marginLeft: '5px'}}/>
               </div>
 
-              {/* The Dropdown Menu (Only shows when open) */}
               {isDropdownOpen && (
                 <div style={{
                   position: 'absolute', top: '60px', right: 0,
                   background: 'white', padding: '10px', borderRadius: '12px',
                   boxShadow: '0 10px 40px rgba(0,0,0,0.1)', zIndex: 100, width: '220px'
                 }}>
-                  <div style={{fontSize: '0.75rem', color: '#a0aec0', marginBottom: '8px', paddingLeft: '8px'}}>
-                    SELECT ACCOUNT
-                  </div>
                   {allUsers.map(user => (
                     <div
                       key={user.discord_id}
@@ -129,23 +137,17 @@ export default function DashboardLayout() {
                   ))}
                 </div>
               )}
-
             </div>
-            {/* ----------------------------- */}
-
           </div>
         </header>
 
-        {/* PASS CURRENT USER DOWN TO PAGES */}
+        {/* This is where Dashboard, Inflation, etc. will render */}
         <main className="page-content">
           <Outlet context={{ currentUser }} />
         </main>
-
       </div>
 
-      {/* PASS CURRENT USER TO SIDEBAR */}
       <RightSidebar currentUser={currentUser} />
-
     </div>
   )
 }
