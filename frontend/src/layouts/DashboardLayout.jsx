@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-// Added 'Cpu' to imports for the explanation icon
 import { LayoutDashboard, TrendingUp, BookOpen, Settings, ChevronDown, Cpu } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import RightSidebar from '../components/RightSidebar';
@@ -80,15 +79,21 @@ export default function DashboardLayout() {
     <div className="app-container">
       {/* LEFT SIDEBAR */}
       <aside className="sidebar">
-        <div className="logo-container">
-          {/* UPDATED LOGO STYLING */}
+        <div className="logo-container" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0' }}>
+          {/* UPDATED LOGO: Now uses the PNG file next to the title */}
+          <img
+            src="/ReceiptRaccoon_Logo.png"
+            alt="Receipt Raccoon Logo"
+            style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+          />
           <span style={{
-            fontSize: '1.6rem',
+            fontSize: '2.7rem',
             fontWeight: '800',
             color: '#fe6b40',
-            letterSpacing: '-0.5px'
+            letterSpacing: '-0.5px',
+            lineHeight: '1'
           }}>
-            Receipt Raccoon
+            Receipt<br/>Raccoon
           </span>
         </div>
 
@@ -103,7 +108,6 @@ export default function DashboardLayout() {
             <BookOpen size={22} /> Instructions
           </NavLink>
 
-          {/* NEW CODE EXPLANATION LINK */}
           <NavLink to="/explanation" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <Cpu size={22} /> Code Explanation
           </NavLink>
