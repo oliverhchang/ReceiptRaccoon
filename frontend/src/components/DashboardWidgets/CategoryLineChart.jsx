@@ -1,3 +1,4 @@
+// src/components/DashboardWidgets/CategoryLineChart.jsx
 import React, { useState, useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 
@@ -21,35 +22,53 @@ const CATEGORY_COLORS = {
 }
 
 export default function CategoryLineChart({ transactions }) {
-  // 1. Change to an array to support multiple selections
   const [selectedCategories, setSelectedCategories] = useState(["Meat / Fish", "Vegetables"])
+  // 1. New State for Time View
+  const [viewMode, setViewMode] = useState('monthly') // 'weekly', 'monthly', 'yearly'
 
   const chartData = useMemo(() => {
     if (!transactions) return []
 
-    // Group totals by date
-    const dateMap = {}
+    const groups = {}
 
     transactions.forEach(t => {
-      const dateKey = new Date(t.purchase_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      const rawDate = t.purchase_date
+      if (!t.purchase_date) return
+      const dateObj = new Date(t.purchase_date)
 
-      if (!dateMap[dateKey]) {
-        dateMap[dateKey] = { date: dateKey, rawDate: rawDate }
-        // Initialize all valid categories to 0 for this date
-        VALID_CATEGORIES.forEach(cat => dateMap[dateKey][cat] = 0)
+      let key = ''
+      let sortTime = 0
+
+      // 2. Logic to determine grouping key based on viewMode
+      if (viewMode === 'weekly') {
+        const d = new Date(dateObj)
+        d.setDate(d.getDate() - d.getDay()) // Set to Sunday
+        key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        sortTime = d.getTime()
+      } else if (viewMode === 'monthly') {
+        key = dateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+        sortTime = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1).getTime()
+      } else if (viewMode === 'yearly') {
+        key = dateObj.getFullYear().toString()
+        sortTime = new Date(dateObj.getFullYear(), 0, 1).getTime()
       }
 
+      // Initialize bucket if it doesn't exist
+      if (!groups[key]) {
+        groups[key] = { date: key, rawDate: sortTime }
+        VALID_CATEGORIES.forEach(cat => groups[key][cat] = 0)
+      }
+
+      // Aggregate Items
       const items = t.receipt_items || []
       items.forEach(item => {
         if (VALID_CATEGORIES.includes(item.category)) {
-          dateMap[dateKey][item.category] += (item.price || 0)
+          groups[key][item.category] += (item.price || 0)
         }
       })
     })
 
-    return Object.values(dateMap).sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate))
-  }, [transactions])
+    return Object.values(groups).sort((a, b) => a.rawDate - b.rawDate)
+  }, [transactions, viewMode]) // Recalculate when viewMode changes
 
   const toggleCategory = (category) => {
     setSelectedCategories(prev =>
@@ -60,8 +79,37 @@ export default function CategoryLineChart({ transactions }) {
   }
 
   return (
-    <div style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', height: '550px' }}>
-      <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: '#2d3748' }}>Multi-Category Overlay</h3>
+    <div style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', height: '100%', display: 'flex', flexDirection: 'column' }}>
+
+      {/* Header Row with Title and View Toggles */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#2d3748' }}>Multi-Category Overlay</h3>
+
+        {/* View Mode Toggle Buttons */}
+        <div style={{ background: '#f7fafc', padding: '4px', borderRadius: '8px', display: 'flex', gap: '4px' }}>
+            {['weekly', 'monthly', 'yearly'].map(m => (
+                <button
+                    key={m}
+                    onClick={() => setViewMode(m)}
+                    style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        textTransform: 'capitalize',
+                        cursor: 'pointer',
+                        background: viewMode === m ? 'white' : 'transparent',
+                        color: viewMode === m ? '#2d3748' : '#718096',
+                        boxShadow: viewMode === m ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    {m}
+                </button>
+            ))}
+        </div>
+      </div>
 
       {/* Category Pill Selectors */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '24px' }}>
@@ -89,34 +137,44 @@ export default function CategoryLineChart({ transactions }) {
         })}
       </div>
 
-      <ResponsiveContainer width="100%" height="70%">
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
-          <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#a0aec0', fontSize: 11}} dy={10} />
-          <YAxis axisLine={false} tickLine={false} tick={{fill: '#a0aec0', fontSize: 11}} tickFormatter={v => `$${v}`} />
-
-          <Tooltip
-             contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}}
-             formatter={(value) => [`$${(value || 0).toFixed(2)}`]} // Safety guard
-          />
-          <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-
-          {/* Dynamically render a Line for each selected category */}
-          {selectedCategories.map(cat => (
-            <Line
-              key={cat}
-              type="monotone"
-              dataKey={cat}
-              name={cat}
-              stroke={CATEGORY_COLORS[cat]}
-              strokeWidth={3}
-              dot={{fill: CATEGORY_COLORS[cat], r: 4}}
-              activeDot={{r: 6, strokeWidth: 0}}
-              connectNulls={true} // Keeps line continuous if a date has $0 for that category
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
+            <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
+                tick={{fill: '#a0aec0', fontSize: 11}}
+                dy={10}
+                minTickGap={30}
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            <YAxis axisLine={false} tickLine={false} tick={{fill: '#a0aec0', fontSize: 11}} tickFormatter={v => `$${v}`} />
+
+            <Tooltip
+               contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}}
+               formatter={(value) => [`$${(value || 0).toFixed(2)}`]}
+               labelStyle={{ fontWeight: 'bold', color: '#2d3748', marginBottom: '5px' }}
+            />
+            <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+
+            {/* Dynamically render a Line for each selected category */}
+            {selectedCategories.map(cat => (
+              <Line
+                key={cat}
+                type="monotone"
+                dataKey={cat}
+                name={cat}
+                stroke={CATEGORY_COLORS[cat]}
+                strokeWidth={3}
+                dot={{fill: CATEGORY_COLORS[cat], r: 4}}
+                activeDot={{r: 6, strokeWidth: 0}}
+                connectNulls={true}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }

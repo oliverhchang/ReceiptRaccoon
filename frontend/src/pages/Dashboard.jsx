@@ -1,27 +1,83 @@
-import React, { useEffect, useState } from 'react'
+// src/pages/Dashboard.jsx
+import React, { useEffect, useState, useMemo } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { Calendar, ShoppingBag, CreditCard } from 'lucide-react'
 
+// 1. IMPORT COLORS
+import { CATEGORY_COLORS, DEFAULT_COLOR } from '../assets/colors'
+
 // Widgets
 import StatCard from '../components/DashboardWidgets/StatCard'
-import CategoryPieChart from '../components/DashboardWidgets/CategoryPieChart'
 import SpendingTrendWithBreakdown from '../components/DashboardWidgets/SpendingTrendWithBreakdown'
-import CategoryLineChart from '../components/DashboardWidgets/CategoryLineChart'
-import ToiletriesTable from '../components/DashboardWidgets/ToiletriesTable'
 import StoreBarChart from '../components/DashboardWidgets/StoreBarChart'
+import CategoryPieChart from '../components/DashboardWidgets/CategoryPieChart'
 import RecentTransactionsTable from '../components/DashboardWidgets/RecentTransactionsTable'
 
 export default function Dashboard() {
   const { currentUser } = useOutletContext()
   const [loading, setLoading] = useState(true)
   const [transactions, setTransactions] = useState([])
-  const [pieData, setPieData] = useState([])
+
+  // VIEW MODE: Weekly / Monthly / Yearly
+  const [viewMode, setViewMode] = useState('monthly')
+
+  // DATA STATES
+  const [processedGraphData, setProcessedGraphData] = useState([])
+
+  // Track which data point is active
+  const [focusedPeriod, setFocusedPeriod] = useState(null)
+
   const [kpi, setKpi] = useState({ lastDate: '-', count: 0, avg: 0 })
 
   useEffect(() => {
     if (currentUser) fetchDashboardData()
   }, [currentUser])
+
+  // Recalculate Graph Data when View Mode changes
+  useEffect(() => {
+    if (transactions.length > 0) {
+      processDataByMode(transactions, viewMode)
+    }
+  }, [viewMode, transactions])
+
+  // --- PIE CHART DATA CALCULATION ---
+  const activePieData = useMemo(() => {
+    let itemsToProcess = []
+
+    // 1. Determine which items to aggregate
+    if (focusedPeriod && focusedPeriod.items) {
+        itemsToProcess = focusedPeriod.items
+    } else {
+        // Fallback: If no focus, use the items from the LAST period in the graph
+        if (processedGraphData.length > 0) {
+             const lastData = processedGraphData[processedGraphData.length - 1]
+             itemsToProcess = lastData.items
+        }
+    }
+
+    // 2. Aggregate by High-Level Category
+    const typeMap = {}
+    itemsToProcess.forEach(item => {
+        // FIX: We prioritize 'receipt_type' (Groceries) over 'category' (Fruits)
+        // because the Dashboard Pie Chart shows High-Level spending.
+        let type = item.receipt_type || "Uncategorized"
+
+        // Normalize
+        if (type === "Grocery") type = "Groceries"
+
+        typeMap[type] = (typeMap[type] || 0) + (item.price || item.total_amount || 0)
+    })
+
+    // 3. Map to Recharts format and Inject Colors
+    return Object.keys(typeMap).map(type => ({
+        name: type,
+        value: typeMap[type],
+        color: CATEGORY_COLORS[type] || DEFAULT_COLOR
+    }))
+
+  }, [focusedPeriod, processedGraphData, transactions])
+
 
   async function fetchDashboardData() {
     setLoading(true)
@@ -29,8 +85,8 @@ export default function Dashboard() {
       const { data: receipts, error } = await supabase
         .from('receipts')
         .select(`
-          id, total_amount, purchase_date, store_name, image_url, 
-          receipt_items ( name, category, price ) 
+            id, total_amount, purchase_date, store_name, image_url, receipt_type,
+            receipt_items ( name, price, category )
         `)
         .eq('discord_user_id', currentUser.discord_id)
         .order('purchase_date', { ascending: true })
@@ -40,52 +96,83 @@ export default function Dashboard() {
       if (receipts && receipts.length > 0) {
         setTransactions(receipts)
 
-        // 1. Calculate Total Spent
+        // Global KPIs
         const totalSpent = receipts.reduce((sum, r) => sum + (r.total_amount || 0), 0)
-
-        // 2. FIND THE LATEST DATE MANUALLY
-        // We iterate through all receipts to find the actual maximum date string
-        let latestDateStr = '';
+        let latestDateStr = ''
         receipts.forEach(r => {
-          if (r.purchase_date && (!latestDateStr || r.purchase_date > latestDateStr)) {
-            latestDateStr = r.purchase_date;
-          }
-        });
-
-        let displayDate = '-'
-        if (latestDateStr) {
-          // Splitting ensures no timezone shifts; YYYY-MM-DD -> MM/DD/YYYY
-          const [year, month, day] = latestDateStr.split('-')
-          if (year && month && day) {
-            displayDate = `${month}/${day}/${year}`
-          }
-        }
-
+           if (r.purchase_date && (!latestDateStr || r.purchase_date > latestDateStr)) latestDateStr = r.purchase_date
+        })
         setKpi({
-          lastDate: displayDate,
+          lastDate: latestDateStr ? new Date(latestDateStr).toLocaleDateString() : '-',
           count: receipts.length,
           avg: totalSpent / receipts.length
         })
-
-        // 3. Category Pie Chart Processing
-        const catMap = {}
-        receipts.forEach(receipt => {
-          receipt.receipt_items.forEach(item => {
-            if (item.category) {
-              catMap[item.category] = (catMap[item.category] || 0) + item.price
-            }
-          })
-        })
-        setPieData(Object.keys(catMap).map(cat => ({ name: cat, value: catMap[cat] })))
       } else {
         setTransactions([])
-        setKpi({ lastDate: '-', count: 0, avg: 0 })
       }
-
     } catch (err) {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  function processDataByMode(data, mode) {
+    const groups = {}
+
+    data.forEach(t => {
+      if (!t.purchase_date) return
+      const dateObj = new Date(t.purchase_date)
+
+      let key = ''
+      let sortTime = 0
+
+      if (mode === 'weekly') {
+        const d = new Date(dateObj)
+        d.setDate(d.getDate() - d.getDay())
+        key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        sortTime = d.getTime()
+      } else if (mode === 'monthly') {
+        key = dateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+        sortTime = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1).getTime()
+      } else if (mode === 'yearly') {
+        key = dateObj.getFullYear().toString()
+        sortTime = new Date(dateObj.getFullYear(), 0, 1).getTime()
+      }
+
+      if (!groups[key]) {
+        groups[key] = {
+            name: key,
+            amount: 0,
+            items: [],
+            sortTime: sortTime
+        }
+      }
+
+      groups[key].amount += (t.total_amount || 0)
+
+      // FIX: Inject the parent 'receipt_type' into every item!
+      if (t.receipt_items && t.receipt_items.length > 0) {
+         const itemsWithType = t.receipt_items.map(i => ({
+             ...i,
+             receipt_type: t.receipt_type // <--- THIS IS THE FIX
+         }))
+         groups[key].items.push(...itemsWithType)
+      } else {
+         groups[key].items.push({
+             name: t.store_name,
+             price: t.total_amount,
+             receipt_type: t.receipt_type // Fallback for no-item receipts
+         })
+      }
+    })
+
+    const graphArray = Object.values(groups).sort((a, b) => a.sortTime - b.sortTime)
+    setProcessedGraphData(graphArray)
+
+    // Default focus to latest
+    if(graphArray.length > 0) {
+        setFocusedPeriod(graphArray[graphArray.length - 1])
     }
   }
 
@@ -94,36 +181,64 @@ export default function Dashboard() {
   return (
     <div className="dashboard-container" style={{maxWidth: '1200px', margin: '0 auto', paddingBottom: '60px'}}>
 
-      <div style={{ marginBottom: '40px' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: '800', color: '#2d3748', margin: 0 }}>Overview</h1>
-        <p style={{ color: '#718096', marginTop: '4px' }}>Welcome back, {currentUser.display_name}</p>
-      </div>
-
-      {/* --- SECTION 1: KPI & OVERALL TREND --- */}
-      <div style={{display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '60px'}}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
-          <StatCard title="Last Grocery Trip" value={kpi.lastDate} icon={Calendar} color="#fe6b40" />
-          <StatCard title="Receipts Scanned" value={kpi.count} icon={ShoppingBag} color="#3b82f6" />
-          <StatCard title="Average Trip" value={`$${kpi.avg.toFixed(2)}`} icon={CreditCard} color="#10b981" />
+      <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: '800', color: '#2d3748', margin: 0 }}>Overview</h1>
+          <p style={{ color: '#718096', marginTop: '4px' }}>Welcome back, {currentUser.display_name}</p>
         </div>
 
-        <SpendingTrendWithBreakdown transactions={transactions} />
+        <div style={{ background: 'white', padding: '4px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', display: 'flex', gap: '4px' }}>
+            {['weekly', 'monthly', 'yearly'].map(m => (
+                <button
+                    key={m}
+                    onClick={() => setViewMode(m)}
+                    style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        textTransform: 'capitalize',
+                        cursor: 'pointer',
+                        background: viewMode === m ? '#fff5f0' : 'transparent',
+                        color: viewMode === m ? '#fe6b40' : '#718096',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    {m}
+                </button>
+            ))}
+        </div>
       </div>
 
-      <h2 style={{fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', marginBottom: '24px'}}>Spending Analysis</h2>
+      <div style={{display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '60px'}}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+          <StatCard title="Last Receipt" value={kpi.lastDate} icon={Calendar} color="#fe6b40" />
+          <StatCard title="Receipts Scanned" value={kpi.count} icon={ShoppingBag} color="#3b82f6" />
+          <StatCard title="Average Spend" value={`$${kpi.avg.toFixed(2)}`} icon={CreditCard} color="#10b981" />
+        </div>
 
-      <div style={{marginBottom: '24px'}}>
-         <CategoryLineChart transactions={transactions} />
+        <SpendingTrendWithBreakdown
+            data={processedGraphData}
+            periodLabel={viewMode === 'weekly' ? 'Week of' : viewMode === 'monthly' ? 'Month' : 'Year'}
+            onHoverPeriod={(period) => setFocusedPeriod(period)}
+        />
       </div>
 
+      <h2 style={{fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', marginBottom: '24px'}}>Spending Habits</h2>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '60px' }}>
         <StoreBarChart transactions={transactions} />
-        <CategoryPieChart data={pieData} />
-      </div>
 
-      <h2 style={{fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', marginBottom: '24px'}}>Frequency Tracker</h2>
-      <div style={{marginBottom: '60px'}}>
-        <ToiletriesTable transactions={transactions} />
+        <div style={{position: 'relative'}}>
+            <CategoryPieChart data={activePieData} />
+            <div style={{
+                position: 'absolute', top: '24px', right: '24px',
+                fontSize: '0.75rem', fontWeight: 'bold',
+                background: '#edf2f7', padding: '4px 8px', borderRadius: '4px', color: '#718096'
+            }}>
+                {focusedPeriod ? focusedPeriod.name : 'Latest'}
+            </div>
+        </div>
       </div>
 
       <h2 style={{fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', marginBottom: '24px'}}>Recent Activity</h2>

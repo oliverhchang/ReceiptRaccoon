@@ -1,11 +1,15 @@
+// src/layouts/DashboardLayout.jsx
 import React, { useEffect, useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { LayoutDashboard, TrendingUp, BookOpen, Settings, ChevronDown, Cpu } from 'lucide-react'
+// 1. IMPORT NEW ICONS (ShoppingCart, Fuel)
+import { LayoutDashboard, TrendingUp, BookOpen, Settings, ChevronDown, Cpu, ShoppingCart, Fuel } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import RightSidebar from '../components/RightSidebar';
 import './DashboardLayout.css'
 
 export default function DashboardLayout() {
+  // ... (Keep all your existing state and useEffect logic here) ...
+  // ... (fetchUsers, checkBotStatus, etc. DO NOT CHANGE) ...
   const [allUsers, setAllUsers] = useState([])
   const [currentUser, setCurrentUser] = useState(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -19,6 +23,7 @@ export default function DashboardLayout() {
   }, [])
 
   async function checkBotStatus() {
+    // ... existing logic ...
     try {
       const { data, error } = await supabase
         .from('system_status')
@@ -39,6 +44,7 @@ export default function DashboardLayout() {
   }
 
   async function fetchUsers() {
+    // ... existing logic ...
     try {
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
@@ -80,7 +86,6 @@ export default function DashboardLayout() {
       {/* LEFT SIDEBAR */}
       <aside className="sidebar">
         <div className="logo-container" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0' }}>
-          {/* UPDATED LOGO: Now uses the PNG file next to the title */}
           <img
             src="/ReceiptRaccoon_Logo.png"
             alt="Receipt Raccoon Logo"
@@ -101,9 +106,21 @@ export default function DashboardLayout() {
           <NavLink to="/" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <LayoutDashboard size={22} /> Dashboard
           </NavLink>
+
+          {/* --- 2. ADD NEW NAV LINKS HERE --- */}
+          <NavLink to="/grocery" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
+            <ShoppingCart size={22} /> Grocery
+          </NavLink>
+
+          <NavLink to="/gas" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
+            <Fuel size={22} /> Gas Station
+          </NavLink>
+          {/* ---------------------------------- */}
+
           <NavLink to="/inflation" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <TrendingUp size={22} /> Inflation
           </NavLink>
+
           <NavLink to="/code" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <BookOpen size={22} /> Instructions
           </NavLink>
@@ -125,29 +142,18 @@ export default function DashboardLayout() {
         <header className="top-header" style={{ justifyContent: 'flex-end' }}>
           <div style={{display: 'flex', alignItems: 'center', gap: '20px'}}>
 
-            {/* BOT STATUS INDICATOR */}
+            {/* BOT STATUS */}
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              borderRadius: '20px',
-              background: 'white',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '20px',
+              background: 'white', boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
               border: botOnline ? '1px solid #c6f6d5' : '1px solid #fed7d7'
             }}>
               <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
+                width: '8px', height: '8px', borderRadius: '50%',
                 backgroundColor: botOnline ? '#48bb78' : '#f56565',
                 boxShadow: botOnline ? '0 0 8px #48bb78' : 'none'
               }}></div>
-              <span style={{
-                fontSize: '0.85rem',
-                fontWeight: '600',
-                color: botOnline ? '#2f855a' : '#c53030'
-              }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: botOnline ? '#2f855a' : '#c53030' }}>
                 {botOnline ? "Bot Online" : "Bot Offline"}
               </span>
             </div>

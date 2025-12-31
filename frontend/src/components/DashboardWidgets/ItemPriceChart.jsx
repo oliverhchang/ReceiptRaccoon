@@ -8,11 +8,12 @@ const LINE_COLORS = ['#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#fe
 
 export default function ItemPriceChart() {
   const [availableItems, setAvailableItems] = useState([])
-  const [selectedItems, setSelectedItems] = useState(['Eggs'])
+  // CHANGED: Default is now empty, so "Eggs" doesn't appear automatically
+  const [selectedItems, setSelectedItems] = useState([])
   const [chartData, setChartData] = useState([])
   const [loading, setLoading] = useState(false)
 
-  // -- NEW SEARCHABLE DROPDOWN STATE --
+  // -- SEARCHABLE DROPDOWN STATE --
   const [searchTerm, setSearchTerm] = useState('')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -21,7 +22,6 @@ export default function ItemPriceChart() {
   useEffect(() => {
     fetchUniqueItems()
 
-    // Click outside to close dropdown
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false)
@@ -42,13 +42,16 @@ export default function ItemPriceChart() {
 
   async function fetchUniqueItems() {
     try {
+      // CHANGED: Added !inner join to filter strictly for Grocery receipts
       const { data, error } = await supabase
         .from('receipt_items')
-        .select('name')
+        .select('name, receipts!inner(receipt_type)')
+        .in('receipts.receipt_type', ['Groceries', 'Grocery']) // Filter logic
         .order('name', { ascending: true })
 
       if (error) throw error
 
+      // Clean and unique list
       const unique = [...new Set(data.map(i => i.name).filter(n => n && n.trim().length > 0))]
       setAvailableItems(unique)
     } catch (err) {
@@ -59,13 +62,15 @@ export default function ItemPriceChart() {
   async function fetchPriceHistory(itemsToFetch) {
     setLoading(true)
     try {
+      // CHANGED: Fetch 'quantity' and ensure we only look at Grocery receipts
       const { data, error } = await supabase
         .from('receipt_items')
         .select(`
-          name, price,
-          receipts ( purchase_date )
+          name, price, quantity,
+          receipts!inner ( purchase_date, receipt_type )
         `)
         .in('name', itemsToFetch)
+        .in('receipts.receipt_type', ['Groceries', 'Grocery'])
         .order('id', { ascending: true })
 
       if (error) throw error
@@ -74,11 +79,16 @@ export default function ItemPriceChart() {
       const rawPoints = []
       data.forEach(row => {
         if (!row.receipts || !row.receipts.purchase_date) return
+
+        // CHANGED: Calculate Unit Price (Price / Quantity)
+        const qty = row.quantity || 1
+        const unitPrice = row.price / qty
+
         rawPoints.push({
           dateKey: new Date(row.receipts.purchase_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           rawDate: new Date(row.receipts.purchase_date),
           item: row.name,
-          price: row.price
+          price: unitPrice // Use the calculated unit price
         })
       })
 
@@ -104,15 +114,14 @@ export default function ItemPriceChart() {
     if (!selectedItems.includes(item)) {
       setSelectedItems([...selectedItems, item])
     }
-    setSearchTerm('') // Clear input
-    setIsDropdownOpen(false) // Close menu
+    setSearchTerm('')
+    setIsDropdownOpen(false)
   }
 
   const handleRemoveItem = (itemToRemove) => {
     setSelectedItems(selectedItems.filter(i => i !== itemToRemove))
   }
 
-  // Filter the list based on what user is typing
   const filteredItems = availableItems.filter(item =>
     item.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -122,14 +131,12 @@ export default function ItemPriceChart() {
 
       <div style={{marginBottom: '20px'}}>
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
-          <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#2d3748' }}>Price Tracker</h3>
+          <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#2d3748' }}>Grocery Inflation Tracker</h3>
           {loading && <span style={{fontSize: '0.8rem', color: '#a0aec0'}}>Updating...</span>}
         </div>
 
         {/* --- SEARCHABLE DROPDOWN CONTAINER --- */}
         <div ref={dropdownRef} style={{position: 'relative', maxWidth: '400px'}}>
-
-          {/* Input Box */}
           <div style={{position: 'relative', display: 'flex', alignItems: 'center'}}>
             <Search size={16} color="#a0aec0" style={{position: 'absolute', left: '12px'}}/>
             <input
@@ -140,7 +147,7 @@ export default function ItemPriceChart() {
                 setIsDropdownOpen(true)
               }}
               onFocus={() => setIsDropdownOpen(true)}
-              placeholder="Search or Select item..."
+              placeholder="Search grocery item (e.g. Milk)..."
               style={{
                 width: '100%', padding: '10px 10px 10px 38px',
                 borderRadius: '8px', border: '1px solid #e2e8f0',
@@ -150,7 +157,6 @@ export default function ItemPriceChart() {
             <ChevronDown size={16} color="#a0aec0" style={{position: 'absolute', right: '12px', pointerEvents: 'none'}}/>
           </div>
 
-          {/* Floating List */}
           {isDropdownOpen && (
             <div style={{
               position: 'absolute', top: '100%', left: 0, right: 0,
@@ -168,7 +174,7 @@ export default function ItemPriceChart() {
                     style={{
                       padding: '10px 12px', cursor: 'pointer', fontSize: '0.9rem', color: '#4a5568',
                       borderBottom: '1px solid #f7fafc',
-                      background: selectedItems.includes(item) ? '#f0fff4' : 'white' // Highlight if already selected
+                      background: selectedItems.includes(item) ? '#f0fff4' : 'white'
                     }}
                     onMouseOver={(e) => !selectedItems.includes(item) && (e.currentTarget.style.background = '#edf2f7')}
                     onMouseOut={(e) => !selectedItems.includes(item) && (e.currentTarget.style.background = 'white')}
@@ -178,7 +184,7 @@ export default function ItemPriceChart() {
                 ))
               ) : (
                 <div style={{padding: '12px', color: '#a0aec0', fontSize: '0.85rem', textAlign: 'center'}}>
-                   No items found matching "{searchTerm}"
+                   No grocery items found matching "{searchTerm}"
                 </div>
               )}
             </div>
@@ -214,7 +220,13 @@ export default function ItemPriceChart() {
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf2f7" />
               <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#a0aec0', fontSize: 12}} dy={10} />
-              <YAxis axisLine={false} tickLine={false} tick={{fill: '#a0aec0', fontSize: 12}} tickFormatter={v => `$${v}`} />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{fill: '#a0aec0', fontSize: 12}}
+                tickFormatter={v => `$${v}`}
+                label={{ value: 'Unit Price ($)', angle: -90, position: 'insideLeft', style: {fill: '#cbd5e0', fontSize: 12} }}
+              />
               <Tooltip
                  contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}
                  formatter={(value, name) => [`$${value.toFixed(2)}`, name]}
@@ -235,7 +247,7 @@ export default function ItemPriceChart() {
           </ResponsiveContainer>
         ) : (
            <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0aec0'}}>
-             {selectedItems.length === 0 ? "Select an item to begin" : "No price history found for these items."}
+             {selectedItems.length === 0 ? "Select a grocery item to track inflation." : "No price history found."}
            </div>
         )}
       </div>
