@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { GROCERY_ITEM_COLORS } from '../../assets/colors'
-// Import chevron icon for a custom look (optional, but good for UX)
 import { ChevronDown } from 'lucide-react'
 
 const CATEGORIES = Object.keys(GROCERY_ITEM_COLORS)
@@ -33,23 +32,53 @@ export default function SubCategoryBreakdown({ transactions }) {
       .slice(0, 10)
   }, [transactions, selectedCategory])
 
+  // Custom Label Function
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
+    const RADIAN = Math.PI / 180;
+    // Push label out further (1.25x radius)
+    const radius = outerRadius * 1.25;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const textAnchor = x > cx ? 'start' : 'end';
+
+    // Hide labels for slices smaller than 3%
+    if (percent < 0.03) return null;
+
+    // Truncate long names (e.g., "Organic Bananas..." -> "Organic Bana...")
+    const displayName = name.length > 15 ? name.substring(0, 14) + '...' : name;
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="#4a5568"
+        textAnchor={textAnchor}
+        dominantBaseline="central"
+        fontSize={12}
+        fontWeight="500"
+      >
+        {`${displayName} (${(percent * 100).toFixed(0)}%)`}
+      </text>
+    );
+  };
+
   return (
     <div style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', height: '550px' }}>
 
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
         <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#2d3748' }}>Item Deep Dive</h3>
 
-        {/* IMPROVED DROPDOWN CONTAINER */}
+        {/* DROPDOWN CONTAINER */}
         <div style={{ position: 'relative', display: 'inline-block' }}>
             <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 style={{
-                    appearance: 'none', // Remove default browser arrow
+                    appearance: 'none',
                     backgroundColor: 'white',
                     border: '1px solid #cbd5e0',
                     borderRadius: '8px',
-                    padding: '8px 36px 8px 16px', // Extra right padding for the icon
+                    padding: '8px 36px 8px 16px',
                     fontSize: '0.95rem',
                     color: '#2d3748',
                     cursor: 'pointer',
@@ -64,13 +93,12 @@ export default function SubCategoryBreakdown({ transactions }) {
                 ))}
             </select>
 
-            {/* Custom Arrow Icon positioned absolutely over the select box */}
             <div style={{
                 position: 'absolute',
                 right: '12px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                pointerEvents: 'none', // Allows clicking through to the select
+                pointerEvents: 'none',
                 color: '#718096'
             }}>
                 <ChevronDown size={16} />
@@ -87,25 +115,22 @@ export default function SubCategoryBreakdown({ transactions }) {
               nameKey="name"
               cx="50%"
               cy="50%"
-              outerRadius={120}
+              // Reduced outerRadius from 120 to 90 to make room for labels
+              outerRadius={90}
               innerRadius={60}
               paddingAngle={3}
-              label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+              label={renderCustomizedLabel}
+              labelLine={true}
             >
               {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={SLICE_COLORS[index % SLICE_COLORS.length]} />
+                  <Cell key={`cell-${index}`} fill={SLICE_COLORS[index % SLICE_COLORS.length]} stroke="none" />
               ))}
             </Pie>
             <Tooltip
                 formatter={(value) => [`$${value.toFixed(2)}`, 'Spent']}
                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
             />
-            <Legend
-              layout="vertical"
-              align="right"
-              verticalAlign="middle"
-              wrapperStyle={{fontSize: '0.85rem', paddingLeft: '20px'}}
-            />
+            {/* Legend Removed */}
           </PieChart>
         </ResponsiveContainer>
       ) : (

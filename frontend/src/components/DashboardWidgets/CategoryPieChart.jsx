@@ -1,8 +1,7 @@
 import React from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
 export default function CategoryPieChart({ data }) {
-  // Guard clause: If no data, show a message instead of crashing
   if (!data || data.length === 0) {
     return (
       <div style={{
@@ -14,6 +13,35 @@ export default function CategoryPieChart({ data }) {
       </div>
     )
   }
+
+  // Custom renderer for the labels with lines
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
+    const RADIAN = Math.PI / 180;
+    // Calculate the position for the label (outside the pie)
+    const radius = outerRadius * 1.2;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    // Determine if text should align left or right based on position
+    const textAnchor = x > cx ? 'start' : 'end';
+
+    // Hide labels for very tiny slices (less than 3%) to prevent clutter
+    if (percent < 0.03) return null;
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="#4a5568"
+        textAnchor={textAnchor}
+        dominantBaseline="central"
+        fontSize={12}
+        fontWeight="500"
+      >
+        {`${name} (${(percent * 100).toFixed(0)}%)`}
+      </text>
+    );
+  };
 
   return (
     <div style={{
@@ -27,34 +55,31 @@ export default function CategoryPieChart({ data }) {
         Spending Breakdown
       </h3>
 
-      <ResponsiveContainer width="100%" height="80%">
+      <ResponsiveContainer width="100%" height="85%">
         <PieChart>
           <Pie
             data={data}
-            innerRadius={60}
-            outerRadius={100}
+            // Made radius smaller (80) to give room for the outside labels
+            innerRadius={50}
+            outerRadius={80}
             paddingAngle={5}
             dataKey="value"
-            label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+            label={renderCustomizedLabel} // Use our custom label function
+            labelLine={true} // Show the connector line
           >
             {data.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                // CHANGE: We now use the color passed in the data object
-                // If no color is provided, it falls back to gray
                 fill={entry.color || '#cbd5e0'}
+                stroke="none"
               />
             ))}
           </Pie>
           <Tooltip
              formatter={(value) => `$${value.toFixed(2)}`}
-             contentStyle={{borderRadius: '8px', border: 'none'}}
+             contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}
           />
-          <Legend
-            verticalAlign="bottom"
-            height={80}
-            wrapperStyle={{ paddingTop: '20px' }}
-          />
+          {/* Removed the <Legend /> component entirely */}
         </PieChart>
       </ResponsiveContainer>
     </div>
