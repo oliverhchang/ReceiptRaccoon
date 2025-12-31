@@ -1,6 +1,6 @@
 // src/pages/Instructions.jsx
 import React from 'react'
-import { MessageSquare, UploadCloud, PieChart, Camera, CheckCircle, Smartphone } from 'lucide-react'
+import { MessageSquare, UploadCloud, PieChart, Camera, CheckCircle, Smartphone, Terminal } from 'lucide-react'
 
 export default function Instructions() {
   return (
@@ -65,7 +65,7 @@ export default function Instructions() {
       </section>
 
       {/* --- STEP 3: TIPS --- */}
-      <section>
+      <section style={{marginBottom: '60px'}}>
         <div style={{display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px'}}>
           <div style={{...iconBoxStyle, background: '#f0fff4'}}><Smartphone size={24} color="#10b981" /></div>
           <h2 style={headerStyle}>3. Pro Tips</h2>
@@ -83,6 +83,52 @@ export default function Instructions() {
             <p style={{color: '#4a5568', fontSize: '0.95rem', lineHeight: '1.5'}}>
               Set your monthly budget in the right sidebar. The bar will turn <span style={{color: '#e53e3e', fontWeight: 'bold'}}>Red</span> if you get close to your limit!
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* --- STEP 4: RASPBERRY PI SETUP --- */}
+      <section>
+        <div style={{display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px'}}>
+          <div style={{...iconBoxStyle, background: '#2d3748'}}><Terminal size={24} color="#fff" /></div>
+          <h2 style={headerStyle}>4. Pi Server Maintenance</h2>
+        </div>
+
+        <div style={{background: 'white', padding: '32px', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)'}}>
+          <p style={{color: '#718096', marginBottom: '20px'}}>Use these commands to manage the bot on the Raspberry Pi.</p>
+
+          <div style={{display: 'grid', gap: '20px'}}>
+
+            {/* Command 1 */}
+            <div style={commandBoxStyle}>
+              <div style={commandTitleStyle}>Connect to Pi</div>
+              <code style={codeBlockStyle}>ssh oliverhchang@oliverhchang.local</code>
+            </div>
+
+            {/* Command 2 */}
+            <div style={commandBoxStyle}>
+              <div style={commandTitleStyle}>Check Status (PM2)</div>
+              <code style={codeBlockStyle}>pm2 list</code>
+              <p style={commentStyle}>Shows if 'raccoon-bot' and dashboard are online.</p>
+            </div>
+
+            {/* Command 3 */}
+            <div style={commandBoxStyle}>
+              <div style={commandTitleStyle}>Update & Restart Bot</div>
+              <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                <code style={codeBlockStyle}>cd ReceiptRaccoon/backend</code>
+                <code style={codeBlockStyle}>pm2 restart raccoon-bot</code>
+              </div>
+              <p style={commentStyle}>Run this after uploading new code.</p>
+            </div>
+
+             {/* Command 4 */}
+             <div style={commandBoxStyle}>
+              <div style={commandTitleStyle}>View Logs</div>
+              <code style={codeBlockStyle}>pm2 logs raccoon-bot</code>
+              <p style={commentStyle}>Use this to see errors or print statements in real-time.</p>
+            </div>
+
           </div>
         </div>
       </section>
@@ -113,3 +159,18 @@ const headerStyle = { fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', m
 const iconBoxStyle = { width: '40px', height: '40px', borderRadius: '10px', background: '#fff5f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }
 const cardGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }
 const listItemStyle = { color: '#4a5568', fontSize: '1rem', lineHeight: '1.6' }
+
+// New Styles for the Code Section
+const commandBoxStyle = { borderBottom: '1px solid #edf2f7', paddingBottom: '16px' }
+const commandTitleStyle = { fontSize: '0.95rem', fontWeight: '600', color: '#2d3748', marginBottom: '8px' }
+const codeBlockStyle = {
+  background: '#2d3748',
+  color: '#4fd1c5',
+  padding: '8px 12px',
+  borderRadius: '6px',
+  fontFamily: 'monospace',
+  fontSize: '0.9rem',
+  display: 'block',
+  width: 'fit-content'
+}
+const commentStyle = { color: '#a0aec0', fontSize: '0.85rem', marginTop: '6px', fontStyle: 'italic', margin: '6px 0 0 0' }
