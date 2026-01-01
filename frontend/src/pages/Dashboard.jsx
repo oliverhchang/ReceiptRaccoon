@@ -12,6 +12,7 @@ import StatCard from '../components/DashboardWidgets/StatCard'
 import SpendingTrendWithBreakdown from '../components/DashboardWidgets/SpendingTrendWithBreakdown'
 import StoreBarChart from '../components/DashboardWidgets/StoreBarChart'
 import CategoryPieChart from '../components/DashboardWidgets/CategoryPieChart'
+import SpendingMap from '../components/DashboardWidgets/SpendingMap' // <--- IMPORTED
 import RecentTransactionsTable from '../components/DashboardWidgets/RecentTransactionsTable'
 
 export default function Dashboard() {
@@ -85,9 +86,10 @@ export default function Dashboard() {
       const { data: receipts, error } = await supabase
         .from('receipts')
         .select(`
-            id, total_amount, purchase_date, store_name, image_url, receipt_type,
+            id, total_amount, purchase_date, store_name, store_address, image_url, receipt_type,
             receipt_items ( name, price, category )
         `)
+        // NOTE: Make sure 'store_address' is in the select query above!
         .eq('discord_user_id', currentUser.discord_id)
         .order('purchase_date', { ascending: true })
 
@@ -155,7 +157,7 @@ export default function Dashboard() {
       if (t.receipt_items && t.receipt_items.length > 0) {
          const itemsWithType = t.receipt_items.map(i => ({
              ...i,
-             receipt_type: t.receipt_type // <--- THIS IS THE FIX
+             receipt_type: t.receipt_type
          }))
          groups[key].items.push(...itemsWithType)
       } else {
@@ -226,7 +228,9 @@ export default function Dashboard() {
       </div>
 
       <h2 style={{fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', marginBottom: '24px'}}>Spending Habits</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '60px' }}>
+
+      {/* 1. Bar Chart and Pie Chart Side-by-Side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
         <StoreBarChart transactions={transactions} />
 
         <div style={{position: 'relative'}}>
@@ -239,6 +243,11 @@ export default function Dashboard() {
                 {focusedPeriod ? focusedPeriod.name : 'Latest'}
             </div>
         </div>
+      </div>
+
+      {/* 2. Map (Full Width) */}
+      <div style={{marginBottom: '60px'}}>
+        <SpendingMap transactions={transactions} />
       </div>
 
       <h2 style={{fontSize: '1.5rem', fontWeight: '700', color: '#2d3748', marginBottom: '24px'}}>Recent Activity</h2>

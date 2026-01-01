@@ -1,5 +1,6 @@
 // src/App.jsx
 import React from 'react'
+import 'leaflet/dist/leaflet.css';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import DashboardLayout from './layouts/DashboardLayout'
 import Dashboard from './pages/Dashboard'
@@ -11,6 +12,7 @@ import CodeExplanation from './pages/CodeExplanation'
 // 1. IMPORT NEW PAGES
 import Grocery from './pages/Grocery'
 import Gas from './pages/Gas'
+
 
 export default function App() {
   return (
