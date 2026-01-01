@@ -5,9 +5,11 @@ import { supabase } from '../supabaseClient'
 import './RightSidebar.css'
 import MonthlyComparison from './DashboardWidgets/MonthlyComparison'
 
-// Consistent with your Discord Bot
+// 1. IMPORT COLORS
+import { CATEGORY_COLORS, DEFAULT_COLOR } from '../assets/colors'
+
 const VALID_CATEGORIES = [
-  "Total", // Special view
+  "Total",
   "Groceries",
   "Restaurants & Dining",
   "Transportation",
@@ -28,24 +30,18 @@ export default function RightSidebar({ currentUser }) {
   const [loading, setLoading] = useState(false)
   const [viewDate, setViewDate] = useState(new Date())
 
-  // New: Selection State
+  // Selection & Editing States
   const [selectedCategory, setSelectedCategory] = useState("Total")
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-
-  // State for Budget Editing
   const [isEditingBudget, setIsEditingBudget] = useState(false)
   const [editBudgetAmount, setEditBudgetAmount] = useState(0)
-
-  // State for Name Editing
   const [isEditingName, setIsEditingName] = useState(false)
   const [newName, setNewName] = useState("")
 
   // Data State
   const [stats, setStats] = useState({
-    receiptDays: [],
-    // Maps category name -> amount spent
+    dayStyles: {}, // Changed from simple array to object map
     spendMap: {},
-    // Maps category name -> budget limit
     budgetMap: {}
   })
 
@@ -65,7 +61,6 @@ export default function RightSidebar({ currentUser }) {
     const endOfMonth = new Date(year, month + 1, 0).toISOString()
 
     try {
-      // 1. Fetch Receipts
       const { data: receipts, error: receiptError } = await supabase
         .from('receipts')
         .select('total_amount, purchase_date, receipt_type')
@@ -75,44 +70,49 @@ export default function RightSidebar({ currentUser }) {
 
       if (receiptError) console.error(receiptError)
 
-      // 2. Fetch User Budgets
       const { data: userData } = await supabase
         .from('users')
         .select('category_budgets')
         .eq('discord_id', currentUser.discord_id)
         .single()
 
-      // 3. Initialize Spend Map based on your VALID_CATEGORIES list
+      // Initialize Maps
       const spendMap = {}
       VALID_CATEGORIES.forEach(c => { if(c !== 'Total') spendMap[c] = 0 })
 
-      const days = []
+      // Logic: If multiple receipts on one day, color by the HIGHEST spend category
+      const dailyMaxSpend = {} // { 5: { amount: 50, color: 'blue' } }
+      const finalDayStyles = {}
 
       receipts?.forEach(r => {
-        // Track days for calendar
-        if (r.purchase_date) {
-            const day = parseInt(r.purchase_date.split('-')[2])
-            if (!days.includes(day)) days.push(day)
-        }
-
-        // --- THE FIX IS HERE ---
+        // 1. Process Spending Aggregates
         let cat = r.receipt_type || "Uncategorized"
+        if (cat === "Grocery") cat = "Groceries" // Normalize
 
-        // Map singular "Grocery" from DB to plural "Groceries" for UI
-        if (cat === "Grocery") cat = "Groceries"
-
-        // Aggregate Spending
-        // We check if the category exists in our map; if not, we put it in Uncategorized
         if (spendMap[cat] !== undefined) {
             spendMap[cat] += (r.total_amount || 0)
         } else {
-            spendMap["Uncategorized"] = (spendMap["Uncategorized"] || 0) + (r.total_amount || 0)
+            spendMap["Uncategorized"] += (r.total_amount || 0)
+        }
+
+        // 2. Process Calendar Colors
+        if (r.purchase_date) {
+            const day = parseInt(r.purchase_date.split('-')[2])
+            const amount = r.total_amount || 0
+
+            // Determine Color
+            const color = CATEGORY_COLORS[cat] || DEFAULT_COLOR
+
+            // Check if this is the "dominant" receipt for the day
+            if (!dailyMaxSpend[day] || amount > dailyMaxSpend[day].amount) {
+                dailyMaxSpend[day] = { amount, color }
+                finalDayStyles[day] = color
+            }
         }
       })
 
-      // 4. Update State
       setStats({
-        receiptDays: days,
+        dayStyles: finalDayStyles,
         spendMap: spendMap,
         budgetMap: userData?.category_budgets || {}
       })
@@ -125,21 +125,10 @@ export default function RightSidebar({ currentUser }) {
   }
 
   // --- ACTIONS ---
-
   async function saveBudget() {
     try {
-      // Create a copy of the current map
       const updatedMap = { ...stats.budgetMap }
-
       if (selectedCategory === "Total") {
-         // If editing "Total", we can't easily distribute it.
-         // Strategy: Maybe we just prevent editing Total?
-         // OR we treat "Total" as a "General Fund" fallback?
-         // For better UX: Let's block editing Total directly, or warn them.
-         // But for this snippet, let's assume we save it as a "Global Target"
-         // or we force them to pick a category.
-
-         // Let's force them to pick a category to edit, OR save it to "Uncategorized"
          alert("Please select a specific category to edit its budget.")
          setIsEditingBudget(false)
          return
@@ -153,7 +142,6 @@ export default function RightSidebar({ currentUser }) {
         .eq('discord_id', currentUser.discord_id)
 
       if (error) throw error
-
       setStats(prev => ({ ...prev, budgetMap: updatedMap }))
       setIsEditingBudget(false)
     } catch (error) {
@@ -175,10 +163,9 @@ export default function RightSidebar({ currentUser }) {
     }
   }
 
-  // --- HELPER: GET CURRENT DISPLAY DATA ---
+  // --- HELPERS ---
   const getDisplayData = () => {
     if (selectedCategory === "Total") {
-        // Sum up everything
         const totalSpent = Object.values(stats.spendMap).reduce((a, b) => a + b, 0)
         const totalBudget = Object.values(stats.budgetMap).reduce((a, b) => a + (Number(b) || 0), 0)
         return { spent: totalSpent, budget: totalBudget }
@@ -195,7 +182,6 @@ export default function RightSidebar({ currentUser }) {
     ? Math.min((currentData.spent / currentData.budget) * 100, 100)
     : (currentData.spent > 0 ? 100 : 0)
 
-  // --- CALENDAR HELPERS ---
   const changeMonth = (offset) => {
     const newDate = new Date(viewDate)
     newDate.setMonth(newDate.getMonth() + offset)
@@ -205,17 +191,36 @@ export default function RightSidebar({ currentUser }) {
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
   const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay()
 
+  // --- RENDER CALENDAR ---
   const renderCalendarDays = () => {
     const daysInMonth = getDaysInMonth(viewDate)
     const startDay = getFirstDayOfMonth(viewDate)
     const cells = []
+
+    // Empty cells for offset
     for (let i = 0; i < startDay; i++) {
       cells.push(<div key={`empty-${i}`} className="cal-day empty"></div>)
     }
+
+    // Day cells
     for (let d = 1; d <= daysInMonth; d++) {
-      const hasReceipt = stats.receiptDays.includes(d)
+      const dayColor = stats.dayStyles[d] // Get the color if exists
+
       cells.push(
-        <div key={d} className={`cal-day ${hasReceipt ? 'active' : ''}`}>{d}</div>
+        <div
+            key={d}
+            className={`cal-day ${dayColor ? 'active' : ''}`}
+            // Apply dynamic background color AND dynamic glow if active
+            style={dayColor ? {
+                backgroundColor: dayColor,
+                borderColor: dayColor,
+                color: 'white',
+                // Add 50% opacity glow matching the color
+                boxShadow: `0 0 8px ${dayColor}80`
+            } : {}}
+        >
+            {d}
+        </div>
       )
     }
     return cells
@@ -256,103 +261,96 @@ export default function RightSidebar({ currentUser }) {
       </div>
 
       {/* 2. BUDGET SECTION */}
-<div className="sidebar-section">
+      <div className="sidebar-section">
+        <div className="section-header" style={{marginBottom: '15px'}}>
+            <div style={{position: 'relative'}}>
+            <button
+                className="category-dropdown-btn"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+                <span>{selectedCategory === "Total" ? "Total Budget" : selectedCategory}</span>
+                <ChevronDown size={14} style={{marginLeft: '8px', opacity: 0.6}}/>
+            </button>
 
-  {/* DROPDOWN HEADER */}
-  <div className="section-header" style={{marginBottom: '15px'}}>
-    <div style={{position: 'relative'}}>
-      <button
-          className="category-dropdown-btn"
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-      >
-          <span>{selectedCategory === "Total" ? "Total Budget" : selectedCategory}</span>
-          <ChevronDown size={14} style={{marginLeft: '8px', opacity: 0.6}}/>
-      </button>
+            {isDropdownOpen && (
+                <div className="category-dropdown-menu">
+                    {VALID_CATEGORIES.map(cat => {
+                        const isSelected = selectedCategory === cat
+                        return (
+                            <div
+                                key={cat}
+                                className={`dropdown-item ${isSelected ? 'active' : ''}`}
+                                onClick={() => {
+                                    setSelectedCategory(cat)
+                                    setIsDropdownOpen(false)
+                                    setIsEditingBudget(false)
+                                }}
+                            >
+                                <span>{cat}</span>
+                                {isSelected && <Check size={14} />}
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+            </div>
 
-      {isDropdownOpen && (
-          <div className="category-dropdown-menu">
-              {VALID_CATEGORIES.map(cat => {
-                  const isSelected = selectedCategory === cat
-                  return (
-                      <div
-                          key={cat}
-                          className={`dropdown-item ${isSelected ? 'active' : ''}`}
-                          onClick={() => {
-                              setSelectedCategory(cat)
-                              setIsDropdownOpen(false)
-                              setIsEditingBudget(false)
-                          }}
-                      >
-                          <span>{cat}</span>
-                          {/* Visual Checkmark for the selected item */}
-                          {isSelected && <Check size={14} />}
-                      </div>
-                  )
-              })}
-          </div>
-      )}
-    </div>
+            <div style={{display: 'flex', gap: '8px'}}>
+            {selectedCategory !== "Total" && !isEditingBudget && (
+                <button
+                onClick={() => {
+                    setEditBudgetAmount(currentData.budget || 0)
+                    setIsEditingBudget(true)
+                }}
+                className="icon-btn"
+                title={`Edit ${selectedCategory} Budget`}
+                >
+                <Edit2 size={14} />
+                </button>
+            )}
+            <TrendingUp size={16} color="#fe6b40" />
+            </div>
+        </div>
 
-    {/* Rest of the header (Edit Button + Icon) */}
-    <div style={{display: 'flex', gap: '8px'}}>
-       {selectedCategory !== "Total" && !isEditingBudget && (
-        <button
-          onClick={() => {
-              // Pre-fill the edit input with the current budget for this category
-              setEditBudgetAmount(currentData.budget || 0)
-              setIsEditingBudget(true)
-          }}
-          className="icon-btn"
-          title={`Edit ${selectedCategory} Budget`}
-        >
-          <Edit2 size={14} />
-        </button>
-      )}
-      <TrendingUp size={16} color="#fe6b40" />
-    </div>
-  </div>
-
-  {/* BUDGET CARD (No changes needed here from previous step) */}
-  <div className="budget-card">
-     {/* ... existing budget card code ... */}
-      <div className="budget-text">
-        <span className="spent">
-            ${currentData.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-        </span>
-        <span className="total" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
-           /
-           {isEditingBudget ? (
-             <>
-               <span style={{fontSize: '1rem', color: '#a0aec0'}}>$</span>
-               <input
-                type="number"
-                value={editBudgetAmount}
-                onChange={(e) => setEditBudgetAmount(Number(e.target.value))}
-                className="budget-input"
-                autoFocus
-               />
-               <button onClick={saveBudget} className="action-btn save"><Check size={14}/></button>
-               <button onClick={() => setIsEditingBudget(false)} className="action-btn cancel"><X size={14}/></button>
-             </>
-           ) : (
-             ` $${(currentData.budget || 0).toLocaleString()}`
-           )}
-        </span>
+        <div className="budget-card">
+            <div className="budget-text">
+                <span className="spent">
+                    ${currentData.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </span>
+                <span className="total" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                /
+                {isEditingBudget ? (
+                    <>
+                    <span style={{fontSize: '1rem', color: '#a0aec0'}}>$</span>
+                    <input
+                        type="number"
+                        value={editBudgetAmount}
+                        onChange={(e) => setEditBudgetAmount(Number(e.target.value))}
+                        className="budget-input"
+                        autoFocus
+                    />
+                    <button onClick={saveBudget} className="action-btn save"><Check size={14}/></button>
+                    <button onClick={() => setIsEditingBudget(false)} className="action-btn cancel"><X size={14}/></button>
+                    </>
+                ) : (
+                    ` $${(currentData.budget || 0).toLocaleString()}`
+                )}
+                </span>
+            </div>
+            <div className="progress-bar-bg">
+                <div
+                    className="progress-bar-fill"
+                    style={{
+                        width: `${percentSpent}%`,
+                        backgroundColor: percentSpent > 100 ? '#ef4444' : '#fe6b40'
+                    }}
+                ></div>
+            </div>
+            <div style={{fontSize: '0.8rem', color: '#a0aec0', marginTop: '8px', textAlign: 'right'}}>
+                {selectedCategory === "Total" ? "Total Used" : `${selectedCategory} Used`}
+            </div>
+        </div>
       </div>
-      <div className="progress-bar-bg">
-        <div
-            className="progress-bar-fill"
-            style={{
-                width: `${percentSpent}%`,
-                backgroundColor: percentSpent > 100 ? '#ef4444' : '#fe6b40'
-            }}
-        ></div>
-      </div>
-      <div style={{fontSize: '0.8rem', color: '#a0aec0', marginTop: '8px', textAlign: 'right'}}>
-        {selectedCategory === "Total" ? "Total Used" : `${selectedCategory} Used`}
-      </div>
-  </div>
-</div>
 
       {/* 3. MONTHLY COMPARISON */}
       {currentUser && <MonthlyComparison currentUser={currentUser} />}

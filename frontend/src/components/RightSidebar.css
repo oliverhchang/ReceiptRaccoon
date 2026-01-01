@@ -229,22 +229,16 @@
   pointer-events: none;
 }
 
-/* Orange Active Day */
 .cal-day.active {
-  background-color: #fe6b40;
+  /* Ensure no static box-shadow exists here that might override the JS */
   color: white;
-  font-weight: bold;
-  box-shadow: 0 4px 10px rgba(254, 107, 64, 0.3);
+  font-weight: 700;
+  border-style: solid; /* Ensures the inline borderColor works */
 }
 
 .cal-day:hover:not(.empty):not(.active) {
   background-color: #f7fafc;
 }
-
-/* ... existing css ... */
-
-/* New Name Input */
-/* src/components/RightSidebar.css */
 
 .name-input {
   background-color: #ffffff; /* Explicit White Background */
