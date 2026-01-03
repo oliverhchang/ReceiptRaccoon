@@ -1,84 +1,69 @@
 // src/layouts/DashboardLayout.jsx
 import React, { useEffect, useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-// 1. IMPORT NEW ICONS (ShoppingCart, Fuel)
-import { LayoutDashboard, TrendingUp, BookOpen, Settings, ChevronDown, Cpu, ShoppingCart, Fuel } from 'lucide-react'
+// 1. ADDED 'Cpu' TO IMPORTS
+import { LayoutDashboard, TrendingUp, BookOpen, Settings, ShoppingCart, Fuel, LogOut, LogIn, User, Cpu } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import RightSidebar from '../components/RightSidebar';
 import './DashboardLayout.css'
 
-export default function DashboardLayout() {
-  // ... (Keep all your existing state and useEffect logic here) ...
-  // ... (fetchUsers, checkBotStatus, etc. DO NOT CHANGE) ...
-  const [allUsers, setAllUsers] = useState([])
+export default function DashboardLayout({ session }) {
   const [currentUser, setCurrentUser] = useState(null)
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [botOnline, setBotOnline] = useState(false)
+  const [authLoading, setAuthLoading] = useState(false)
 
   useEffect(() => {
-    fetchUsers()
     checkBotStatus()
+    if (session) {
+      fetchMyProfile()
+    } else {
+      setCurrentUser(null)
+    }
+
     const interval = setInterval(checkBotStatus, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [session])
 
   async function checkBotStatus() {
-    // ... existing logic ...
     try {
-      const { data, error } = await supabase
-        .from('system_status')
-        .select('last_heartbeat')
-        .eq('service_name', 'discord_bot')
-        .single()
-
-      if (data && data.last_heartbeat) {
-        const lastSeen = new Date(data.last_heartbeat).getTime()
-        const now = new Date().getTime()
-        const diffMinutes = (now - lastSeen) / 1000 / 60
-        setBotOnline(diffMinutes < 2.5)
+      const { data } = await supabase.from('system_status').select('last_heartbeat').eq('service_name', 'discord_bot').single()
+      if (data?.last_heartbeat) {
+        const diff = (new Date().getTime() - new Date(data.last_heartbeat).getTime()) / 60000
+        setBotOnline(diff < 2.5)
       }
-    } catch (err) {
-      console.error("Status check failed", err)
-      setBotOnline(false)
-    }
+    } catch (e) { setBotOnline(false) }
   }
 
-  async function fetchUsers() {
-    // ... existing logic ...
+  async function fetchMyProfile() {
     try {
-      const { data: receiptData, error: receiptError } = await supabase
-        .from('receipts')
-        .select('discord_user_id')
+      const discordId = session?.user?.user_metadata?.provider_id
+      if (!discordId) return
 
-      if (receiptError) throw receiptError
-
-      const activeUserIds = [...new Set(receiptData.map(r => r.discord_user_id))]
-
-      if (activeUserIds.length === 0) {
-        setAllUsers([])
-        return
-      }
-
-      const { data: activeUsers, error: userError } = await supabase
+      const { data, error } = await supabase
         .from('users')
         .select('*')
-        .in('discord_id', activeUserIds)
+        .eq('discord_id', discordId)
+        .single()
 
-      if (userError) throw userError
-
-      if (activeUsers && activeUsers.length > 0) {
-        setAllUsers(activeUsers)
-        setCurrentUser(prev => prev || activeUsers[0])
-      }
-
+      if (data) setCurrentUser(data)
+      if (error) console.error("Profile fetch error:", error)
     } catch (error) {
-      console.error("Error fetching active users:", error)
+      console.error("Error:", error)
     }
   }
 
-  const switchUser = (user) => {
-    setCurrentUser(user)
-    setIsDropdownOpen(false)
+  const handleLogin = async () => {
+    setAuthLoading(true)
+    await supabase.auth.signInWithOAuth({
+      provider: 'discord',
+      options: { redirectTo: window.location.origin }
+    })
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setCurrentUser(null)
+    window.location.reload()
   }
 
   return (
@@ -86,18 +71,8 @@ export default function DashboardLayout() {
       {/* LEFT SIDEBAR */}
       <aside className="sidebar">
         <div className="logo-container" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0' }}>
-          <img
-            src="/ReceiptRaccoon_Logo.png"
-            alt="Receipt Raccoon Logo"
-            style={{ width: '100px', height: '100px', objectFit: 'contain' }}
-          />
-          <span style={{
-            fontSize: '2.7rem',
-            fontWeight: '800',
-            color: '#fe6b40',
-            letterSpacing: '-0.5px',
-            lineHeight: '1'
-          }}>
+          <img src="/ReceiptRaccoon_Logo.png" alt="Logo" style={{ width: '100px', height: '100px', objectFit: 'contain' }} />
+          <span style={{ fontSize: '2.7rem', fontWeight: '800', color: '#fe6b40', letterSpacing: '-0.5px', lineHeight: '1' }}>
             Receipt<br/>Raccoon
           </span>
         </div>
@@ -106,25 +81,18 @@ export default function DashboardLayout() {
           <NavLink to="/" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <LayoutDashboard size={22} /> Dashboard
           </NavLink>
-
-          {/* --- 2. ADD NEW NAV LINKS HERE --- */}
           <NavLink to="/grocery" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <ShoppingCart size={22} /> Grocery
           </NavLink>
-
           <NavLink to="/gas" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <Fuel size={22} /> Gas Station
           </NavLink>
-          {/* ---------------------------------- */}
-
           <NavLink to="/inflation" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <TrendingUp size={22} /> Inflation
           </NavLink>
-
           <NavLink to="/code" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <BookOpen size={22} /> Instructions
           </NavLink>
-
           <NavLink to="/explanation" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
             <Cpu size={22} /> Code Explanation
           </NavLink>
@@ -142,7 +110,7 @@ export default function DashboardLayout() {
         <header className="top-header" style={{ justifyContent: 'flex-end' }}>
           <div style={{display: 'flex', alignItems: 'center', gap: '20px'}}>
 
-            {/* BOT STATUS */}
+            {/* Bot Status */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '20px',
               background: 'white', boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
@@ -158,47 +126,63 @@ export default function DashboardLayout() {
               </span>
             </div>
 
-            {/* User Dropdown */}
-            <div style={{position: 'relative'}}>
-              <div className="user-profile" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
-                <div style={{textAlign: 'right'}}>
-                  <div style={{fontWeight: '700', fontSize: '0.9rem', color: '#2d3748'}}>
-                    {currentUser ? currentUser.display_name : "Loading..."}
-                  </div>
-                  <div style={{fontSize: '0.75rem', color: '#a0aec0'}}>Switch User</div>
-                </div>
-                {currentUser ? (
-                  <img src={currentUser.avatar_url} alt="avatar" className="avatar" style={{objectFit: 'cover'}} />
-                ) : (
-                  <div className="avatar">?</div>
-                )}
-                <ChevronDown size={16} color="#a0aec0" style={{marginLeft: '5px'}}/>
-              </div>
-
-              {isDropdownOpen && (
-                <div style={{
-                  position: 'absolute', top: '60px', right: 0,
-                  background: 'white', padding: '10px', borderRadius: '12px',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.1)', zIndex: 100, width: '220px'
-                }}>
-                  {allUsers.map(user => (
-                    <div
-                      key={user.discord_id}
-                      onClick={() => switchUser(user)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        padding: '10px', borderRadius: '8px', cursor: 'pointer',
-                        background: currentUser?.discord_id === user.discord_id ? '#fff5f0' : 'transparent',
-                        color: currentUser?.discord_id === user.discord_id ? '#fe6b40' : '#2d3748'
-                      }}
-                    >
-                      <img src={user.avatar_url} alt="av" style={{width: '30px', height: '30px', borderRadius: '50%'}}/>
-                      <span style={{fontSize: '0.9rem', fontWeight: '500'}}>{user.display_name}</span>
+            {/* DYNAMIC AUTH SECTION */}
+            {currentUser ? (
+              // 1. LOGGED IN VIEW
+              <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                  <div style={{textAlign: 'right'}}>
+                    <div style={{fontWeight: '700', fontSize: '0.9rem', color: '#2d3748'}}>
+                      {currentUser.display_name}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    <div style={{fontSize: '0.75rem', color: '#48bb78'}}>Active</div>
+                  </div>
+                  <img src={currentUser.avatar_url} alt="av" className="avatar" style={{border: '2px solid #48bb78'}} />
+
+                  {/* 2. UPDATED LOGOUT BUTTON (More Intuitive) */}
+                  <button
+                    onClick={handleLogout}
+                    title="Sign Out"
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        background: '#fff5f5', // Very light red bg
+                        border: '1px solid #fc8181', // Red border
+                        color: '#c53030', // Dark red text
+                        padding: '8px 12px', borderRadius: '10px',
+                        fontSize: '0.85rem', fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#fed7d7'}
+                    onMouseOut={(e) => e.currentTarget.style.background = '#fff5f5'}
+                  >
+                    <LogOut size={16} />
+                    <span>Sign Out</span>
+                  </button>
+              </div>
+            ) : (
+              // 2. GUEST VIEW (SIGN IN BUTTON)
+              <button
+                onClick={handleLogin}
+                disabled={authLoading}
+                style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    background: '#5865F2', color: 'white',
+                    border: 'none', padding: '10px 20px', borderRadius: '12px',
+                    fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer',
+                    boxShadow: '0 4px 10px rgba(88, 101, 242, 0.3)',
+                    transition: 'transform 0.1s'
+                }}
+              >
+                {authLoading ? (
+                    <span>Connecting...</span>
+                ) : (
+                    <>
+                        <LogIn size={18} />
+                        <span>Sign In</span>
+                    </>
+                )}
+              </button>
+            )}
           </div>
         </header>
 
