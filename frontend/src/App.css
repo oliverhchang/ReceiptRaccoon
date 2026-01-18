@@ -1,8 +1,11 @@
+/* App.css */
 #root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+
+  /* remove width: 100% here too, it's not needed if max-width is set */
 }
 
 .logo {
@@ -39,4 +42,26 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* App.css - Add this at the very bottom */
+
+@media (max-width: 768px) {
+  /* 1. Target the container that holds Sidebar + Content */
+  #root {
+    flex-direction: column; /* Stack them top-to-bottom instead of left-to-right */
+  }
+
+  /* 2. Make the Sidebar take full width */
+  .sidebar-class-name {
+    width: 100%;       /* Make it fill the phone screen width */
+    height: auto;      /* Let it grow as needed, rather than being full screen height */
+    position: relative; /* Stop it from sticking if it's set to fixed/absolute */
+  }
+
+  /* 3. Make the Main Content take full width */
+  .main-content-class-name {
+    width: 100%;
+    margin-left: 0;    /* Remove any margin meant for the desktop sidebar */
+  }
 }
