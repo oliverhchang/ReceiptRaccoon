@@ -73,3 +73,30 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* index.css */
+
+/* This targets mobile screens (phones) */
+@media (max-width: 768px) {
+
+  /* * IMPORTANT: You must replace '.dashboard-container' below
+   * with the ACTUAL class name used in your DashboardLayout.jsx file.
+   * If you don't have a class there, see Step 2.
+   */
+  .dashboard-container {
+    flex-direction: column !important; /* Forces vertical stacking */
+  }
+
+  /* Make the sidebar full width and not fixed height */
+  .sidebar {
+    width: 100% !important;
+    height: auto !important;
+    position: relative !important;
+  }
+
+  /* Make the main content area full width */
+  main, .content {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+}

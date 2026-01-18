@@ -118,3 +118,47 @@
   overflow-y: auto;
   height: 100%;
 }
+/* --- MOBILE LAYOUT FIX --- */
+@media (max-width: 768px) {
+
+  /* 1. Stack the layout vertically instead of side-by-side */
+  .app-container {
+    flex-direction: column !important;
+    height: auto !important; /* Stop forcing 100% screen height */
+    overflow-x: hidden; /* Prevent horizontal scrolling */
+  }
+
+  /* 2. Fix the Left Sidebar to sit at the top */
+  .sidebar {
+    width: 100% !important;
+    height: auto !important; /* Let it shrink/grow based on content */
+    min-width: 0 !important;
+    position: relative !important;
+    border-right: none !important;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 20px;
+  }
+
+  /* 3. Make the "Receipt Raccoon" logo smaller on phone so it fits */
+  .logo-container span {
+    font-size: 2rem !important; /* Shrink from 2.7rem */
+  }
+  .logo-container img {
+    width: 60px !important; /* Shrink logo image */
+    height: 60px !important;
+  }
+
+  /* 4. Fix the Main Content area to take full width */
+  .main-wrapper {
+    width: 100% !important;
+    height: auto !important;
+    padding: 15px !important; /* Reduce padding on mobile */
+    overflow: visible !important;
+  }
+
+  /* 5. HIDE the Right Sidebar on mobile */
+  /* (It usually takes up too much space on phones. We target the 3rd child) */
+  .app-container > :nth-child(3) {
+    display: none !important;
+  }
+}
