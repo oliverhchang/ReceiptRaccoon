@@ -31,6 +31,9 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# --- CATEGORY LISTS ---
+
+# List A: For the WHOLE Receipt (Budgeting)
 VALID_EXPENSE_CATEGORIES = [
     "Home & Utilities", "Transportation", "Groceries",
     "Personal & Family Care", "Health", "Insurance",
@@ -39,22 +42,23 @@ VALID_EXPENSE_CATEGORIES = [
     "Business Expenses", "Education", "Finance", "Uncategorized"
 ]
 
+# List B: For Individual Items (Grocery Analysis)
+VALID_ITEM_CATEGORIES = [
+    "Fruits", "Vegetables", "Meat / Fish", "Dairy & Eggs",
+    "Grains & Staples", "Frozen Foods", "Snacks & Sweets",
+    "Beverages", "Condiments & Cooking", "Household",
+    "Personal Care", "Misc"
+]
+
 # Emoji Mapping for feedback
 CATEGORY_EMOJIS = {
-    "Home & Utilities": "🏠",
-    "Transportation": "🚗",
-    "Groceries": "🛒",
-    "Personal & Family Care": "🧴",
-    "Health": "🏥",
-    "Insurance": "🛡️",
-    "Restaurants & Dining": "🍔",
-    "Shopping & Entertainment": "🛍️",
-    "Travel": "✈️",
-    "Cash, Checks & Misc": "💵",
-    "Giving": "🎁",
-    "Business Expenses": "💼",
-    "Education": "📚",
-    "Finance": "💰",
+    "Home & Utilities": "🏠", "Transportation": "🚗",
+    "Groceries": "🛒", "Personal & Family Care": "🧴",
+    "Health": "🏥", "Insurance": "🛡️",
+    "Restaurants & Dining": "🍔", "Shopping & Entertainment": "🛍️",
+    "Travel": "✈️", "Cash, Checks & Misc": "💵",
+    "Giving": "🎁", "Business Expenses": "💼",
+    "Education": "📚", "Finance": "💰",
     "Uncategorized": "❓"
 }
 
@@ -92,12 +96,16 @@ async def handle_receipts(message):
             )
             image_url = supabase.storage.from_("receipts").get_public_url(file_name)
 
-            # C. AI Extraction (Updated to ask for Address)
+            # C. AI Extraction (Updated for Dual Categorization)
             prompt = f"""
-            Analyze this receipt. 1. Categorize into one of: {json.dumps(VALID_EXPENSE_CATEGORIES)}.
-            For Gas/Fuel receipts: You must extract the volume (Gallons or Liters) and output it to the quantity field. Do NOT default quantity to 1. If the receipt shows 'Price/Gal', calculate the quantity as Total Item Price / Price Per Gallon
-            
-            2. Extract into JSON:
+            Analyze this receipt.
+
+            1. Categorize the **WHOLE RECEIPT** into exactly one of these: {json.dumps(VALID_EXPENSE_CATEGORIES)}.
+               - For Gas/Fuel receipts: You MUST extract the volume (Gallons or Liters) and put it in the item 'quantity'. If not listed, calculate it as Total Price / Price Per Gallon.
+
+            2. Categorize **EACH ITEM** into exactly one of these: {json.dumps(VALID_ITEM_CATEGORIES)}.
+
+            3. Extract into this JSON format:
             {{
                 "overall_category": str,
                 "store": str,
@@ -105,21 +113,27 @@ async def handle_receipts(message):
                 "date": "YYYY-MM-DD",
                 "total": float,
                 "items": [
-                    {{"name": str, "quantity": int, "total_price": float}}
+                    {{
+                        "name": str, 
+                        "quantity": int, 
+                        "total_price": float,
+                        "category": str 
+                    }}
                 ]
             }}
             """
+
             response = await asyncio.to_thread(
                 model.generate_content,
                 [prompt, {"mime_type": attachment.content_type, "data": image_bytes}]
             )
             data = json.loads(response.text)
 
-            # D. Save Main Receipt Row (Updated to save Address)
+            # D. Save Main Receipt Row
             receipt_entry = {
                 "discord_user_id": str(message.author.id),
                 "store_name": data.get("store", "Unknown Store"),
-                "store_address": data.get("address"),  # <--- Now capturing address
+                "store_address": data.get("address"),
                 "purchase_date": data.get("date"),
                 "total_amount": data.get("total", 0.0),
                 "image_url": image_url,
@@ -128,15 +142,17 @@ async def handle_receipts(message):
             res_db = supabase.table("receipts").insert(receipt_entry).execute()
             new_id = res_db.data[0]['id']
 
-            # E. Save Items with Quantities
+            # E. Save Items with Quantities AND Categories
             items_to_save = [
                 {
                     "receipt_id": new_id,
                     "name": item.get('name', 'Unknown'),
                     "price": item.get('total_price', 0.0),
-                    "quantity": item.get('quantity', 1)
+                    "quantity": item.get('quantity', 1),
+                    "category": item.get('category', 'Misc')
                 } for item in data.get("items", [])
             ]
+
             if items_to_save:
                 supabase.table("receipt_items").insert(items_to_save).execute()
 
@@ -192,6 +208,20 @@ async def heartbeat():
 @tasks.loop(hours=24)
 async def scheduled_sync():
     print("Running daily sync...")
+    # Optional: Loop through guilds/members to sync automatically
+    for guild in bot.guilds:
+        for member in guild.members:
+            if not member.bot:
+                user_data = {
+                    "discord_id": str(member.id),
+                    "display_name": member.display_name,
+                    "handle": member.name,
+                    "avatar_url": str(member.display_avatar.url)
+                }
+                try:
+                    supabase.table("users").upsert(user_data).execute()
+                except:
+                    continue
 
 
 bot.run(DISCORD_TOKEN)
