@@ -116,28 +116,28 @@ export default function ManualReceiptForm({ onReceiptAdded, currentUser }) {
             />
         </div>
 
-        {/* Amount & Date Row */}
-        <div className="form-row">
-            <div className="input-group">
-                <DollarSign size={16} className="input-icon" />
-                <input
-                    type="number"
-                    placeholder="0.00"
-                    step="0.01"
-                    value={total}
-                    onChange={(e) => setTotal(e.target.value)}
-                    required
-                />
-            </div>
-            <div className="input-group">
-                <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    required
-                    className="date-input"
-                />
-            </div>
+        {/* Amount (Now on its own line) */}
+        <div className="input-group">
+            <DollarSign size={16} className="input-icon" />
+            <input
+                type="number"
+                placeholder="0.00"
+                step="0.01"
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
+                required
+            />
+        </div>
+
+        {/* Date (Now on its own line) */}
+        <div className="input-group">
+            <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                className="date-input"
+            />
         </div>
 
         {/* Category */}
