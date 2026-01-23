@@ -333,3 +333,165 @@
   background: #cbd5e0;
   border-radius: 3px;
 }
+/* --- 5. MANUAL RECEIPT FORM --- */
+
+/* The Main "Add Receipt" Button (Closed State) */
+.manual-add-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #fe6b40, #ff8c6b);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(254, 107, 64, 0.2);
+  transition: all 0.2s ease;
+}
+
+.manual-add-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(254, 107, 64, 0.3);
+}
+
+/* The Form Container (Open State) */
+.manual-form-card {
+  background: #ffffff;
+  border: 1px solid #edf2f7;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.manual-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+}
+
+.manual-form-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #2d3748;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+}
+
+/* Add a little orange pill accent next to title */
+.manual-form-header h3::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 16px;
+  background-color: #fe6b40;
+  border-radius: 4px;
+  margin-right: 8px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #a0aec0;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background-color: #f7fafc;
+  color: #e53e3e;
+}
+
+/* Form Inputs styling */
+.manual-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 10px;
+  color: #a0aec0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.input-group input,
+.input-group select {
+  width: 100%;
+  padding: 10px 10px 10px 34px; /* Space for icon */
+  background-color: #f8fafc;
+  border: 1px solid #edf2f7;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #4a5568;
+  outline: none;
+  transition: all 0.2s;
+}
+
+/* Specific fix for Date input text alignment */
+.date-input {
+  padding-left: 10px !important; /* Date inputs often don't need the icon padding if icon is hidden or native */
+  color: #718096;
+}
+
+.input-group input::placeholder {
+  color: #cbd5e0;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+  background-color: #ffffff;
+  border-color: #fe6b40; /* Orange border on focus */
+  box-shadow: 0 0 0 3px rgba(254, 107, 64, 0.1);
+}
+
+.save-receipt-btn {
+  margin-top: 8px;
+  background-color: #2d3748; /* Dark grey for secondary action */
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.save-receipt-btn:hover {
+  background-color: #1a202c;
+}
+
+.save-receipt-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

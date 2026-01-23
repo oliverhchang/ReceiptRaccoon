@@ -4,25 +4,16 @@ import { Calendar as CalendarIcon, TrendingUp, ChevronLeft, ChevronRight, Edit2,
 import { supabase } from '../supabaseClient'
 import './RightSidebar.css'
 import MonthlyComparison from './DashboardWidgets/MonthlyComparison'
+import ManualReceiptForm from './ManualReceiptForm'
 
-// 1. IMPORT COLORS
+// IMPORT COLORS
 import { CATEGORY_COLORS, DEFAULT_COLOR } from '../assets/colors'
 
 const VALID_CATEGORIES = [
-  "Total",
-  "Groceries",
-  "Restaurants & Dining",
-  "Transportation",
-  "Home & Utilities",
-  "Shopping & Entertainment",
-  "Health",
-  "Travel",
-  "Personal & Family Care",
-  "Education",
-  "Business Expenses",
-  "Finance",
-  "Giving",
-  "Cash, Checks & Misc",
+  "Total", "Groceries", "Restaurants & Dining", "Transportation",
+  "Home & Utilities", "Shopping & Entertainment", "Health",
+  "Travel", "Personal & Family Care", "Education",
+  "Business Expenses", "Finance", "Giving", "Cash, Checks & Misc",
   "Uncategorized"
 ]
 
@@ -40,7 +31,7 @@ export default function RightSidebar({ currentUser }) {
 
   // Data State
   const [stats, setStats] = useState({
-    dayStyles: {}, // Changed from simple array to object map
+    dayStyles: {},
     spendMap: {},
     budgetMap: {}
   })
@@ -80,14 +71,12 @@ export default function RightSidebar({ currentUser }) {
       const spendMap = {}
       VALID_CATEGORIES.forEach(c => { if(c !== 'Total') spendMap[c] = 0 })
 
-      // Logic: If multiple receipts on one day, color by the HIGHEST spend category
-      const dailyMaxSpend = {} // { 5: { amount: 50, color: 'blue' } }
+      const dailyMaxSpend = {}
       const finalDayStyles = {}
 
       receipts?.forEach(r => {
-        // 1. Process Spending Aggregates
         let cat = r.receipt_type || "Uncategorized"
-        if (cat === "Grocery") cat = "Groceries" // Normalize
+        if (cat === "Grocery") cat = "Groceries"
 
         if (spendMap[cat] !== undefined) {
             spendMap[cat] += (r.total_amount || 0)
@@ -95,15 +84,11 @@ export default function RightSidebar({ currentUser }) {
             spendMap["Uncategorized"] += (r.total_amount || 0)
         }
 
-        // 2. Process Calendar Colors
         if (r.purchase_date) {
             const day = parseInt(r.purchase_date.split('-')[2])
             const amount = r.total_amount || 0
-
-            // Determine Color
             const color = CATEGORY_COLORS[cat] || DEFAULT_COLOR
 
-            // Check if this is the "dominant" receipt for the day
             if (!dailyMaxSpend[day] || amount > dailyMaxSpend[day].amount) {
                 dailyMaxSpend[day] = { amount, color }
                 finalDayStyles[day] = color
@@ -197,25 +182,21 @@ export default function RightSidebar({ currentUser }) {
     const startDay = getFirstDayOfMonth(viewDate)
     const cells = []
 
-    // Empty cells for offset
     for (let i = 0; i < startDay; i++) {
       cells.push(<div key={`empty-${i}`} className="cal-day empty"></div>)
     }
 
-    // Day cells
     for (let d = 1; d <= daysInMonth; d++) {
-      const dayColor = stats.dayStyles[d] // Get the color if exists
+      const dayColor = stats.dayStyles[d]
 
       cells.push(
         <div
             key={d}
             className={`cal-day ${dayColor ? 'active' : ''}`}
-            // Apply dynamic background color AND dynamic glow if active
             style={dayColor ? {
                 backgroundColor: dayColor,
                 borderColor: dayColor,
                 color: 'white',
-                // Add 50% opacity glow matching the color
                 boxShadow: `0 0 8px ${dayColor}80`
             } : {}}
         >
@@ -357,10 +338,26 @@ export default function RightSidebar({ currentUser }) {
 
       {/* 4. CALENDAR */}
       <div className="sidebar-section">
-        <div className="section-header">
-           <h4 style={{margin: 0}}>Activity</h4>
-           <button onClick={goToToday} className="today-btn">Today</button>
-           <CalendarIcon size={16} color="#a0aec0" />
+        {/* UPDATED: 'Today' button moved back here, aligned with Header */}
+        <div className="section-header" style={{ justifyContent: 'space-between' }}>
+           <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+               <h4 style={{margin: 0}}>Activity</h4>
+               <CalendarIcon size={16} color="#a0aec0" />
+           </div>
+           {/* The Jump to Today Button */}
+           <button
+                onClick={goToToday}
+                className="today-btn"
+                style={{
+                    fontSize: '0.75rem',
+                    padding: '2px 8px',
+                    backgroundColor: '#edf2f7',
+                    color: '#4a5568',
+                    borderRadius: '6px'
+                }}
+            >
+                Jump to Today
+           </button>
         </div>
 
         <div className="calendar-nav">
@@ -375,6 +372,17 @@ export default function RightSidebar({ currentUser }) {
           {['S','M','T','W','T','F','S'].map(d => <div key={d} className="cal-head">{d}</div>)}
           {renderCalendarDays()}
         </div>
+      </div>
+
+      {/* 5. FOOTER: Manual Receipt Only */}
+      <div style={{ marginTop: 'auto', paddingTop: '15px' }}>
+          <ManualReceiptForm
+              currentUser={currentUser}
+              onReceiptAdded={() => {
+                  fetchUserStats();
+                  window.location.reload();
+              }}
+          />
       </div>
     </aside>
   )

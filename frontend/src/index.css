@@ -100,3 +100,19 @@ button:focus-visible {
     margin-left: 0 !important;
   }
 }
+
+/* Width of the scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* The moving part of the scrollbar */
+::-webkit-scrollbar-thumb {
+  background: #ccc; /* Light grey */
+  border-radius: 5px;
+}
+
+/* The background of the scrollbar */
+::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Very light grey/white */
+}
