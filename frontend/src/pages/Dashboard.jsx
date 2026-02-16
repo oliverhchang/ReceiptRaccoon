@@ -4,7 +4,7 @@ import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { Calendar, ShoppingBag, CreditCard } from 'lucide-react'
 
-// 1. IMPORT COLORS
+// IMPORT COLORS
 import { CATEGORY_COLORS, DEFAULT_COLOR } from '../assets/colors'
 
 // Widgets
@@ -12,11 +12,11 @@ import StatCard from '../components/DashboardWidgets/StatCard'
 import SpendingTrendWithBreakdown from '../components/DashboardWidgets/SpendingTrendWithBreakdown'
 import StoreBarChart from '../components/DashboardWidgets/StoreBarChart'
 import CategoryPieChart from '../components/DashboardWidgets/CategoryPieChart'
-import SpendingMap from '../components/DashboardWidgets/SpendingMap' // <--- IMPORTED
+import SpendingMap from '../components/DashboardWidgets/SpendingMap'
 import RecentTransactionsTable from '../components/DashboardWidgets/RecentTransactionsTable'
 
 export default function Dashboard() {
-  const { currentUser } = useOutletContext()
+  const { currentUser } = useOutletContext() // Ensure this context provides currentUser
   const [loading, setLoading] = useState(true)
   const [transactions, setTransactions] = useState([])
 
@@ -60,13 +60,8 @@ export default function Dashboard() {
     // 2. Aggregate by High-Level Category
     const typeMap = {}
     itemsToProcess.forEach(item => {
-        // FIX: We prioritize 'receipt_type' (Groceries) over 'category' (Fruits)
-        // because the Dashboard Pie Chart shows High-Level spending.
-        let type = item.receipt_type || "Uncategorized"
-
-        // Normalize
+        let type = item.category || "Uncategorized" // In our new processDataByMode, 'category' IS the high-level type
         if (type === "Grocery") type = "Groceries"
-
         typeMap[type] = (typeMap[type] || 0) + (item.price || item.total_amount || 0)
     })
 
@@ -89,7 +84,6 @@ export default function Dashboard() {
             id, total_amount, purchase_date, store_name, store_address, image_url, receipt_type,
             receipt_items ( name, price, category )
         `)
-        // NOTE: Make sure 'store_address' is in the select query above!
         .eq('discord_user_id', currentUser.discord_id)
         .order('purchase_date', { ascending: true })
 
@@ -153,18 +147,27 @@ export default function Dashboard() {
 
       groups[key].amount += (t.total_amount || 0)
 
-      // FIX: Inject the parent 'receipt_type' into every item!
+      // --- CRITICAL FIX FOR FILTERING ---
+      // The Chart Widget filters by 'category', but the Dropdown uses Receipt Types (e.g. "Groceries").
+      // The items in the DB have low-level categories (e.g. "Fruits").
+      // We must OVERWRITE 'category' here to be the Receipt Type so they match.
+
       if (t.receipt_items && t.receipt_items.length > 0) {
          const itemsWithType = t.receipt_items.map(i => ({
-             ...i,
-             receipt_type: t.receipt_type
+             name: i.name,
+             price: i.price,
+             store: t.store_name, // Pass store name for context
+             // Align category with Receipt Type (normalize "Grocery" -> "Groceries")
+             category: (t.receipt_type === "Grocery" ? "Groceries" : t.receipt_type) || "Uncategorized"
          }))
          groups[key].items.push(...itemsWithType)
       } else {
+         // Handle manual receipts that might have no items
          groups[key].items.push({
              name: t.store_name,
              price: t.total_amount,
-             receipt_type: t.receipt_type // Fallback for no-item receipts
+             store: t.store_name,
+             category: (t.receipt_type === "Grocery" ? "Groceries" : t.receipt_type) || "Uncategorized"
          })
       }
     })
@@ -186,7 +189,7 @@ export default function Dashboard() {
       <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: '800', color: '#2d3748', margin: 0 }}>Overview</h1>
-          <p style={{ color: '#718096', marginTop: '4px' }}>Welcome back, {currentUser.display_name}</p>
+          <p style={{ color: '#718096', marginTop: '4px' }}>Welcome back, {currentUser?.display_name || 'User'}</p>
         </div>
 
         <div style={{ background: 'white', padding: '4px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', display: 'flex', gap: '4px' }}>
@@ -220,10 +223,12 @@ export default function Dashboard() {
           <StatCard title="Average Spend" value={`$${kpi.avg.toFixed(2)}`} icon={CreditCard} color="#10b981" />
         </div>
 
+        {/* Updated Widget with currentUser passed in */}
         <SpendingTrendWithBreakdown
             data={processedGraphData}
             periodLabel={viewMode === 'weekly' ? 'Week of' : viewMode === 'monthly' ? 'Month' : 'Year'}
             onHoverPeriod={(period) => setFocusedPeriod(period)}
+            currentUser={currentUser}
         />
       </div>
 
